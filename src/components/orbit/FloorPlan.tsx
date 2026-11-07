@@ -1,4 +1,6 @@
 import { useRef, type MouseEvent } from "react";
+import type { Track } from "livekit-client";
+import { AvatarVideo } from "@/components/orbit/AvatarVideo";
 import { DOORS, PLAN, ROOMS, type DoorState, type Pt, type RoomKey } from "@/lib/house";
 
 export type PlanAvatar = {
@@ -11,6 +13,7 @@ export type PlanAvatar = {
   moving?: boolean;
   inVoice?: boolean;
   isMe?: boolean;
+  track?: Track | undefined;
 };
 
 type Props = {
@@ -204,9 +207,11 @@ export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
           <ellipse cx={0} cy={20} rx={16} ry={5} fill="var(--wall)" opacity={0.15} />
           <g className={a.moving ? "" : "avatar-idle"}>
             <circle r={20} fill={`var(--${a.color})`} stroke={a.isMe ? "var(--wall)" : "var(--card)"} strokeWidth={a.isMe ? 4 : 3} />
+            {a.track ? <AvatarVideo track={a.track} isMe={a.isMe} /> : <g>
             <circle cx={-6} cy={-4} r={2.5} fill="var(--wall)" />
             <circle cx={6} cy={-4} r={2.5} fill="var(--wall)" />
             <path d="M -6 6 Q 0 11 6 6" stroke="var(--wall)" strokeWidth={2} fill="none" strokeLinecap="round" />
+            </g>}
           </g>
           {a.status && <circle cx={15} cy={-15} r={6} fill={statusColor[a.status] ?? "var(--muted)"} stroke="var(--card)" strokeWidth={2} />}
           <g transform="translate(0, 38)">

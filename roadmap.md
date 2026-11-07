@@ -3,4 +3,9 @@
 - [x] Founders' Loft plan, click-to-move, realtime presence, room detection
 - [x] Open / Knock / Locked doors (server-enforced for voice), statuses, auto-away
 - [x] LiveKit camera dock + room-scoped voice (code ready)
-- [ ] Real camera/mic test on two devices (needs a person with a webcam)
+- [ ] Real camera/mic test on two devices (blocked: credential rotation and real devices; no existing credentials were inspected or changed)
+- [x] Show camera video on moving avatars and offer create/join by shared house code
+- [x] Investigate stuck guest/create flow; bounded failures and duplicate-safe retry (original shared-preview hang not reproduced locally)
+- [x] Serialize voice teardown/join, cancel stale switches and clean up on unmount
+- [x] Expose actual camera/mic/voice states, failures and retry
+- [x] Run regression tests and browser checks; report changed files and security follow-ups; do not publish

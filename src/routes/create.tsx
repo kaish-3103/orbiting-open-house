@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Logo } from "@/components/orbit/Logo";
 import { ColorPicker } from "@/components/orbit/IdentityPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureGuest } from "@/lib/guest";
+import { bounded } from "@/lib/async-operation";
 
 export const Route = createFileRoute("/create")({
   head: () => ({
@@ -35,17 +36,33 @@ function Create() {
   const [color, setColor] = useState("sage");
   const [house, setHouse] = useState("");
   const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState("");
+  const request = useRef<string | null>(null);
+  const submitting = useRef(false);
 
   async function finish() {
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
+    setFailure("");
     try {
       await ensureGuest();
-      const { data, error } = await supabase.rpc("create_house", { _name: house, _display_name: name, _color: color });
+      if (!request.current) {
+        request.current = sessionStorage.getItem("orbit-create-request") ?? crypto.randomUUID();
+        sessionStorage.setItem("orbit-create-request", request.current);
+      }
+      const { data, error } = await bounded(supabase.rpc("create_house_once", { _name: house, _display_name: name, _color: color, _request_id: request.current }), "Creating your house is taking too long. Check your connection and retry; retrying won't create a second house.");
       if (error) throw error;
-      nav({ to: "/house/$houseId", params: { houseId: data as string } });
+      if (!data) throw new Error("The house wasn't confirmed. Please retry.");
+      await nav({ to: "/house/$houseId", params: { houseId: data } });
+      sessionStorage.removeItem("orbit-create-request");
     } catch (e) {
-      toast.error((e as Error).message);
+      const message = e instanceof Error ? e.message : "Couldn't create your house. Check your connection and retry.";
+      setFailure(message);
+      toast.error(message);
+    } finally {
       setBusy(false);
+      submitting.current = false;
     }
   }
 
@@ -64,7 +81,8 @@ function Create() {
       </div>) },
     { title: "Name your house", ok: house.trim().length > 0, body: <Input autoFocus value={house} maxLength={60} onChange={(e) => setHouse(e.target.value)} placeholder="e.g. The Launchpad" className="h-12 text-lg" /> },
   ];
-  const s = steps[step]!;
+  const s = steps[step];
+  if (!s) return null;
 
   return (
     <div className="min-h-screen bg-background bg-glow">
@@ -74,9 +92,10 @@ function Create() {
         <h1 className="mb-6 text-4xl font-semibold">{s.title}</h1>
         <form onSubmit={(e) => { e.preventDefault(); if (!s.ok) return; if (step < steps.length - 1) setStep(step + 1); else finish(); }}>
           {s.body}
+          {failure && <p role="alert" className="mt-4 text-sm text-destructive">{failure}</p>}
           <div className="mt-8 flex justify-between">
-            <Button type="button" variant="ghost" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</Button>
-            <Button type="submit" disabled={!s.ok || busy} className="rounded-full px-7">{step === steps.length - 1 ? (busy ? "Moving in…" : "Enter the house") : "Continue"}</Button>
+            <Button type="button" variant="ghost" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>Back</Button>
+            <Button type="submit" disabled={!s.ok || busy} className="rounded-full px-7">{step === steps.length - 1 ? (busy ? "Moving in…" : failure ? "Retry safely" : "Enter the house") : "Continue"}</Button>
           </div>
         </form>
       </main>

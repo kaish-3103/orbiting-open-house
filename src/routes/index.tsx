@@ -49,7 +49,7 @@ function Landing() {
             Orbit is a virtual house you leave open all day. Everyone has a room, a little avatar, and an optional webcam. Talking is as easy as walking through a door.
           </p>
           <div className="mt-8 flex justify-center gap-3">
-            <Button asChild size="lg" className="rounded-full px-7"><Link to="/create">Enter Orbit</Link></Button>
+            <Button asChild size="lg" className="rounded-full px-7"><Link to="/enter">Enter Orbit</Link></Button>
             <Button asChild size="lg" variant="outline" className="rounded-full px-7"><Link to="/create">Create Your House</Link></Button>
           </div>
         </section>

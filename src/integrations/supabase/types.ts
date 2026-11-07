@@ -111,6 +111,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          creation_request: string | null
           id: string
           name: string
           template: string
@@ -118,6 +119,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          creation_request?: string | null
           id?: string
           name: string
           template?: string
@@ -125,6 +127,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          creation_request?: string | null
           id?: string
           name?: string
           template?: string
@@ -167,6 +170,15 @@ export type Database = {
     Functions: {
       create_house: {
         Args: { _color: string; _display_name: string; _name: string }
+        Returns: string
+      }
+      create_house_once: {
+        Args: {
+          _color: string
+          _display_name: string
+          _name: string
+          _request_id: string
+        }
         Returns: string
       }
       invite_preview: {

@@ -90,8 +90,10 @@ export const leaveVoiceRoom = createServerFn({ method: "POST" })
         `${data.houseId}:voice:${data.roomKey}`,
         context.userId,
       );
-    } catch {
-      // participant already gone
+    } catch (error) {
+      // Only an already-absent participant is a successful teardown. Other
+      // failures must block rejoining with the same identity.
+      if (!(error instanceof Error && "status" in error && error.status === 404)) return { ok: false };
     }
     return { ok: true };
   });

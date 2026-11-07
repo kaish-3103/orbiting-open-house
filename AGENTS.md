@@ -34,3 +34,6 @@ use the editor.
 - Avatar movement is broadcast (path per click) and presence on a private realtime topic `house:<id>`, gated by RLS on realtime.messages via `is_house_member` — never write positions to tables.
 - Voice/video use LiveKit with tokens from `src/lib/livekit.functions.ts`: one house-wide camera-only room plus one mic-only room per voice room; door state is enforced server-side when issuing voice tokens.
 - Guests are anonymous auth users; houses are joined only through `join_house(token)` RPC so house IDs alone grant nothing.
+- House creation retries use a persisted per-attempt UUID and `create_house_once`; enforce idempotency in the database so uncertain responses never create duplicates.
+- Voice transitions use the serialized VoiceSession queue; await server removal before joining with the same identity, and keep teardown failures blocking retries.
+- Media presence reflects confirmed publications, not requested toggles; avatar videos attach/detach the same tracks as the dock.

@@ -45,6 +45,8 @@ function House() {
   const [invite, setInvite] = useState<string | null>(null);
   const [denied, setDenied] = useState(false);
   const [doorsLoaded, setDoorsLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [peers, setPeers] = useState<Record<string, Presence>>({});
   const [status, setStatus] = useState<Status>("available");
   const [camOn, setCamOn] = useState(false);
@@ -73,7 +75,9 @@ function House() {
   }, [houseId]);
 
   useEffect(() => {
+    setLoadError("");
     (async () => {
+      try {
       const uid = await ensureGuest();
       setMe(uid);
       const { data: h } = await supabase.from("houses").select("name").eq("id", houseId).maybeSingle();
@@ -82,6 +86,7 @@ function House() {
       const { data: inv } = await supabase.from("house_invites").select("token").eq("house_id", houseId).eq("revoked", false).limit(1).maybeSingle();
       setInvite(inv?.token ?? null);
       await Promise.all([loadDoors(), loadMembers()]);
+      } catch (error) { setLoadError(error instanceof Error ? error.message : "Couldn't load your house. Please retry."); }
     })();
     const ch = supabase.channel(`db-${houseId}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "room_doors", filter: `house_id=eq.${houseId}` }, () => loadDoors())
@@ -89,22 +94,22 @@ function House() {
       .on("postgres_changes", { event: "*", schema: "public", table: "house_members", filter: `house_id=eq.${houseId}` }, () => loadMembers())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [houseId, loadDoors, loadMembers]);
+  }, [houseId, loadDoors, loadMembers, loadAttempt]);
 
   const memberMap = useMemo(() => Object.fromEntries(members.map((m) => [m.user_id, m])), [members]);
   const doorMap = useMemo(() => Object.fromEntries(doors.map((d) => [d.room_key, d])) as Record<string, Door>, [doors]);
   const myDoorKey = doors.find((d) => d.owner_id === me)?.room_key as RoomKey | undefined;
   const access = useCallback((room: RoomKey) => me ? canEnter(room, me, doorMap[room], grants.some((g) => g.room_key === room && g.user_id === me)) : "locked", [me, doorMap, grants]);
 
-  const media = useOrbitMedia({ houseId, myRoom, autoVoice, micOn, camOn, allowedRooms: (r) => access(r) === "ok" });
+  const media = useOrbitMedia({ houseId, enabled: !!me && doorsLoaded && !denied, myRoom, autoVoice, micOn, camOn, allowedRooms: (r) => access(r) === "ok", onCameraFailed: () => setCamOn(false), onMicFailed: () => setMicOn(false) });
 
   // ---------- presence ----------
   const myPresence = useCallback((): Presence | null => {
     if (!me) return null;
     const m = memberMap[me];
     const pos = motions.current[me]?.pos ?? spawnPoint(myDoorKey ?? null);
-    return { uid: me, name: m?.display_name ?? "Guest", color: m?.color ?? "sage", status, room: roomAt(pos), x: pos.x, y: pos.y, cam: camOn, mic: micOn, voice: !!media.voiceRoom };
-  }, [me, memberMap, status, camOn, micOn, media.voiceRoom, myDoorKey]);
+    return { uid: me, name: m?.display_name ?? "Guest", color: m?.color ?? "sage", status, room: roomAt(pos), x: pos.x, y: pos.y, cam: media.cameraPublished, mic: media.micPublished, voice: !!media.voiceRoom };
+  }, [me, memberMap, status, media.cameraPublished, media.micPublished, media.voiceRoom, myDoorKey]);
   const presenceRef = useRef(myPresence);
   presenceRef.current = myPresence;
 
@@ -164,7 +169,7 @@ function House() {
   const statusRef = useRef(status); statusRef.current = status;
 
   // re-track on state changes
-  useEffect(() => { const p = myPresence(); if (p && chan.current) chan.current.track(p); }, [status, camOn, micOn, media.voiceRoom, myRoom, memberMap]);
+  useEffect(() => { const p = myPresence(); if (p && chan.current) chan.current.track(p); }, [myPresence, myRoom]);
 
   // ---------- movement ----------
   useEffect(() => {
@@ -262,12 +267,7 @@ function House() {
   async function toggleAutoVoice() {
     if (autoVoice) { setAutoVoice(false); setMicOn(false); return; }
     if (media.state === "unconfigured") { toast("Voice isn't set up for this house yet"); return; }
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-      s.getTracks().forEach((t) => t.stop());
-      setAutoVoice(true);
-      toast("Voice will connect when you share a room. Your mic stays muted until you unmute.");
-    } catch { toast.error("Microphone permission was denied"); }
+    setAutoVoice(true);
   }
   function toggleCam() {
     if (media.state === "unconfigured") { toast("Video isn't set up for this house yet"); return; }
@@ -275,6 +275,7 @@ function House() {
   }
   function toggleMic() {
     if (!autoVoice) { toast("Turn on auto-connect voice first"); return; }
+    if (!media.voiceRoom) { toast("Connect to voice in a room first"); return; }
     setMicOn((m) => !m);
   }
   function changeStatus(s: Status) {
@@ -289,8 +290,7 @@ function House() {
   }
   function copyInvite() {
     if (!invite) return;
-    navigator.clipboard.writeText(`${window.location.origin}/join/${invite}`);
-    toast.success("Invite link copied");
+    navigator.clipboard.writeText(invite).then(() => toast.success("House code copied"), () => toast.error("Couldn't copy. Select the house code and copy it."));
   }
   async function leave() {
     setCamOn(false); setMicOn(false); setAutoVoice(false);
@@ -300,25 +300,26 @@ function House() {
   if (denied) return (
     <div className="flex min-h-screen items-center justify-center bg-background"><div className="text-center"><h1 className="text-3xl font-semibold">You don't have a key to this house.</h1><p className="mt-2 text-muted-foreground">Ask a member for an invite link.</p></div></div>
   );
+  if (loadError) return <div className="flex min-h-screen items-center justify-center bg-background"><div className="max-w-md space-y-4 px-6"><p role="alert">{loadError}</p><Button onClick={() => setLoadAttempt((n) => n + 1)}>Retry</Button></div></div>;
 
   const online = Object.values(peers);
   const avatars: PlanAvatar[] = online.map((p) => {
     const pos = motions.current[p.uid]?.pos ?? { x: p.x, y: p.y };
-    return { id: p.uid, name: p.name, color: p.color, x: pos.x, y: pos.y, status: p.status, moving: !!motions.current[p.uid]?.path.length, inVoice: p.voice && media.speakers.includes(p.uid) || (p.voice && p.uid === me), isMe: p.uid === me };
+    return { id: p.uid, name: p.name, color: p.color, x: pos.x, y: pos.y, status: p.status, moving: !!motions.current[p.uid]?.path.length, inVoice: p.voice && media.speakers.includes(p.uid) || (p.voice && p.uid === me), isMe: p.uid === me, track: media.videos[p.uid] };
   });
   const doorView = Object.fromEntries(doors.map((d) => [d.room_key, { state: d.state, ownerName: d.owner_id ? memberMap[d.owner_id]?.display_name : undefined }]));
   const myDoor = myDoorKey ? doorMap[myDoorKey] : undefined;
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      <header className="flex items-center justify-between bg-chrome px-5 py-3 text-chrome-foreground">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-2 bg-chrome px-5 py-3 text-chrome-foreground">
+        <div className="flex min-w-0 items-center gap-3">
           <Logo light />
           <span className="h-5 w-px bg-chrome-muted" />
-          <span className="font-display text-lg">{houseName}</span>
-          <span className="flex items-center gap-1.5 rounded-full bg-chrome-muted px-3 py-1 text-sm"><Users className="h-3.5 w-3.5" />{online.length} online</span>
+          <span className="max-w-48 truncate font-display text-lg">{houseName}</span>
+          <span className="hidden items-center gap-1.5 rounded-full bg-chrome-muted px-3 py-1 text-sm sm:flex"><Users className="h-3.5 w-3.5" />{online.length} online</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {myDoor && (
             <div className="flex items-center gap-1 rounded-full bg-chrome-muted p-1 text-sm">
               <span className="px-2 opacity-70">Your door</span>
@@ -329,7 +330,8 @@ function House() {
               ))}
             </div>
           )}
-          <Button size="sm" variant="secondary" className="rounded-full" onClick={copyInvite}><Link2 className="mr-1 h-4 w-4" />Invite</Button>
+          {invite && <span className="select-all font-mono text-xs" aria-label="House code">{invite}</span>}
+          <Button size="sm" variant="secondary" className="rounded-full" onClick={copyInvite}><Link2 className="mr-1 h-4 w-4" />Copy code</Button>
         </div>
       </header>
 
@@ -339,7 +341,7 @@ function House() {
             <FloorPlan avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} highlight={myRoom} />
           </div>
           <div className="pointer-events-none absolute top-6 left-1/2 -translate-x-1/2 rounded-full bg-chrome px-4 py-1.5 text-sm text-chrome-foreground shadow-float">
-            {myRoom ? ROOMS[myRoom].label : "…"} · {media.voiceRoom ? <span className="text-live">Voice connected</span> : autoVoice ? (myRoom === "hallway" ? "No voice in the hallway" : "Connecting voice…") : "Voice off"}
+            {myRoom ? ROOMS[myRoom].label : "…"} · {media.voiceRoom ? <span className="text-live">Voice connected</span> : media.voiceState === "error" ? "Voice failed" : autoVoice ? (myRoom === "hallway" ? "No voice in the hallway" : media.voiceState === "connecting" ? "Connecting voice…" : "Voice unavailable") : "Voice off"}
           </div>
           {media.state === "unconfigured" && (
             <div className="absolute bottom-6 left-6 max-w-xs rounded-2xl border bg-card p-4 text-sm shadow-float">
@@ -347,9 +349,13 @@ function House() {
               <p className="text-muted-foreground">Movement and presence work now. Video and room voice switch on once the house's LiveKit keys are added.</p>
             </div>
           )}
+          {Object.values(media.errors).some(Boolean) && <div role="alert" className="absolute bottom-6 left-6 max-w-xs space-y-2 rounded-lg border bg-card p-4 text-sm shadow-float">
+            {Object.entries(media.errors).map(([key, error]) => error ? <p key={key}>{error}</p> : null)}
+            {(media.errors.voice || media.errors.connection) && <Button size="sm" variant="outline" onClick={media.retry}>Retry connection</Button>}
+          </div>}
         </main>
 
-        <aside className={`border-l bg-card transition-all ${dockOpen ? "w-72" : "w-12"}`}>
+        <aside className={`hidden shrink-0 border-l bg-card transition-all sm:block ${dockOpen ? "w-72" : "w-12"}`}>
           <button onClick={() => setDockOpen(!dockOpen)} className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold" aria-label="Toggle video dock">
             {dockOpen && <span>People</span>}{dockOpen ? <ChevronDown className="h-4 w-4 -rotate-90" /> : <ChevronUp className="h-4 w-4 -rotate-90" />}
           </button>
@@ -366,9 +372,9 @@ function House() {
         </aside>
       </div>
 
-      <footer className="flex items-center justify-center gap-2 border-t bg-card px-4 py-3">
-        <Button variant={camOn ? "default" : "outline"} className="rounded-full" onClick={toggleCam}>{camOn ? <Camera className="mr-1 h-4 w-4" /> : <CameraOff className="mr-1 h-4 w-4" />}{camOn ? "Camera on" : "Camera off"}</Button>
-        <Button variant={micOn ? "default" : "outline"} className="rounded-full" onClick={toggleMic}>{micOn ? <Mic className="mr-1 h-4 w-4" /> : <MicOff className="mr-1 h-4 w-4" />}{micOn ? "Mic on" : "Muted"}</Button>
+      <footer className="flex flex-wrap items-center justify-center gap-2 border-t bg-card px-4 py-3">
+        <Button disabled={media.cameraBusy || media.state !== "ready"} variant={media.cameraPublished ? "default" : "outline"} className="rounded-full" onClick={toggleCam}>{media.cameraPublished ? <Camera className="mr-1 h-4 w-4" /> : <CameraOff className="mr-1 h-4 w-4" />}{media.cameraBusy ? "Camera…" : media.cameraPublished ? "Camera on" : "Camera off"}</Button>
+        <Button disabled={media.micBusy || !media.voiceRoom} variant={media.micPublished ? "default" : "outline"} className="rounded-full" onClick={toggleMic}>{media.micPublished ? <Mic className="mr-1 h-4 w-4" /> : <MicOff className="mr-1 h-4 w-4" />}{media.micBusy ? "Mic…" : media.micPublished ? "Mic on" : "Muted"}</Button>
         <Button variant={autoVoice ? "default" : "outline"} className="rounded-full" onClick={toggleAutoVoice}><Radio className="mr-1 h-4 w-4" />Auto-connect voice {autoVoice ? "on" : "off"}</Button>
         <select value={status} onChange={(e) => changeStatus(e.target.value as Status)} className="h-9 rounded-full border bg-background px-3 text-sm" aria-label="Availability">
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
