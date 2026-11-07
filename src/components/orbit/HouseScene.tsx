@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
 import { DOORS, ROOMS, type RoomKey } from '@/lib/house';
 import { planToWorld, worldToPlan } from '@/lib/house-scene';
-import type { SpaceStyle } from './HouseView';
+import { layoutPoint, type SpaceStyle } from '@/lib/layout';
 import type { FloorPlanProps, PlanAvatar } from './FloorPlan';
 import { Furniture, WorkplaceFurniture } from './WorkplaceFurniture';
 
@@ -77,11 +77,11 @@ function AvatarCamera({ track, isMe }: { track: Track; isMe?: boolean | undefine
   return <video ref={ref} autoPlay playsInline muted className={`h-full w-full object-cover ${isMe ? '-scale-x-100' : ''}`} />;
 }
 
-function Avatar({ avatar, onClick, palette }: { avatar: PlanAvatar; onClick: FloorPlanProps['onAvatarClick']; palette: Palette }) {
+function Avatar({ avatar, onClick, palette, spaceStyle }: { avatar: PlanAvatar; spaceStyle:SpaceStyle; onClick: FloorPlanProps['onAvatarClick']; palette: Palette }) {
   const ref = useRef<Group>(null);
   const a=avatar;
-  useFrame(() => { if(ref.current) { const [x,,z]=planToWorld(a); ref.current.position.set(x,0.22,z); } });
-  return <group ref={ref} position={planToWorld(a)}>
+  useFrame(() => { if(ref.current) { const [x,,z]=planToWorld(layoutPoint(a,spaceStyle)); ref.current.position.set(x,0.22,z); } });
+  return <group ref={ref} position={planToWorld(layoutPoint(a,spaceStyle))}>
     <mesh rotation-x={-Math.PI/2}><ringGeometry args={[0.24,0.3,32]} /><meshBasicMaterial color={palette[a.inVoice ? 'live' : a.color] ?? palette.sage} /></mesh>
     <Html center position={[0,0.65,0]} zIndexRange={[20,0]}>
       <div className="flex w-24 flex-col items-center">
@@ -96,6 +96,7 @@ function Avatar({ avatar, onClick, palette }: { avatar: PlanAvatar; onClick: Flo
 
 function Scene({ props, palette, reset, spaceStyle }: { props: FloorPlanProps; palette: Palette; reset: number; spaceStyle: SpaceStyle }) {
   const controls=useRef<OrbitControlsType>(null);
+  const map=(p:{x:number;y:number})=>planToWorld(layoutPoint(p,spaceStyle));
   const { camera, size, gl } = useThree();
   useEffect(()=>{
     const c=camera as OrthographicCamera;
@@ -112,22 +113,22 @@ function Scene({ props, palette, reset, spaceStyle }: { props: FloorPlanProps; p
     <Box position={[0,-0.15,0]} size={[11.6,0.28,7.4]} color={palette['wood-dark']} />
     <group position={[0,0.015,0]}><FloorTexture palette={palette} /></group>
     {(Object.keys(ROOMS) as RoomKey[]).map(k=>{
-      const r=ROOMS[k].rect,[x,,z]=planToWorld({x:r.x+r.w/2,y:r.y+r.h/2});
+      const r=ROOMS[k].rect,[x,,z]=map({x:r.x+r.w/2,y:r.y+r.h/2});
       const setting=props.settings?.find(s=>s.room_key===k);
       return <group key={k}>
-        <mesh position={[x,0.025,z]} rotation-x={-Math.PI/2} receiveShadow onClick={e=>{ if(e.delta>5) return; e.stopPropagation(); props.onFloorClick?.(worldToPlan(e.point.x,e.point.z)); }}>
-          <planeGeometry args={[r.w/100,r.h/100]} /><meshStandardMaterial color={palette[setting?.palette ?? `room-${k==='hallway'?'hall':k==='bedroom1'?'bedroom':k}`] ?? palette.floor} transparent opacity={0.32} roughness={0.9} />
+        <mesh position={[x,0.025,z]} rotation-x={-Math.PI/2} receiveShadow onClick={e=>{ if(e.delta>5) return; e.stopPropagation(); props.onFloorClick?.(layoutPoint(worldToPlan(e.point.x,e.point.z),spaceStyle,true)); }}>
+          <planeGeometry args={[(layoutPoint({x:r.x+r.w,y:r.y},spaceStyle).x-layoutPoint({x:r.x,y:r.y},spaceStyle).x)/100,(layoutPoint({x:r.x,y:r.y+r.h},spaceStyle).y-layoutPoint({x:r.x,y:r.y},spaceStyle).y)/100]} /><meshStandardMaterial color={palette[setting?.palette ?? `room-${k==='hallway'?'hall':k==='bedroom1'?'bedroom':k}`] ?? palette.floor} transparent opacity={0.32} roughness={0.9} />
         </mesh>
-        <Html position={[x,0.04,(r.y+30-390)/100]} center zIndexRange={[1,0]} style={{pointerEvents:'none'}}><span className="whitespace-nowrap hidden sm:inline whitespace-nowrap rounded bg-card/80 px-1 text-[10px] font-semibold text-muted-foreground">{setting?.name ?? ROOMS[k].label}{props.doors?.[k]?.ownerName ? ` · ${props.doors[k]?.ownerName}` : ''}</span></Html>
+        <Html position={[x,0.04,map({x:r.x,y:r.y+30})[2]]} center zIndexRange={[1,0]} style={{pointerEvents:'none'}}><span className="whitespace-nowrap hidden sm:inline whitespace-nowrap rounded bg-card/80 px-1 text-[10px] font-semibold text-muted-foreground">{setting?.name ?? ROOMS[k].label}{props.doors?.[k]?.ownerName ? ` · ${props.doors[k]?.ownerName}` : ''}</span></Html>
       </group>;
     })}
     {walls.map(([x1,y1,x2,y2],i)=>{
-      const [x,,z]=planToWorld({x:(x1+x2)/2,y:(y1+y2)/2}); const outer=i<3; const height=outer?0.85:0.42;
-      return <Box key={i} position={[x,height/2,z]} size={[Math.max(Math.abs(x2-x1)/100,0.08),height,Math.max(Math.abs(y2-y1)/100,0.08)]} color={palette['scene-wall']} />;
+      const [x,,z]=map({x:(x1+x2)/2,y:(y1+y2)/2}); const outer=i<3; const height=outer?0.85:0.42;
+      return <Box key={i} position={[x,height/2,z]} size={[Math.max(Math.abs(layoutPoint({x:x2,y:y2},spaceStyle).x-layoutPoint({x:x1,y:y1},spaceStyle).x)/100,0.08),height,Math.max(Math.abs(layoutPoint({x:x2,y:y2},spaceStyle).y-layoutPoint({x:x1,y:y1},spaceStyle).y)/100,0.08)]} color={palette['scene-wall']} />;
     })}
     {Object.entries(DOORS).map(([key,d])=>{
-      const state=props.doors?.[key as RoomKey]?.state ?? 'open'; const [x,,z]=planToWorld({x:(d.x0+d.x1)/2,y:d.wallY});
-      return <group key={key}><Box position={[x,0.035,z]} size={[(d.x1-d.x0)/100,0.04,0.16]} color={palette.wood} />{key.startsWith('bedroom') && <Html center position={[x,0.2,z]} zIndexRange={[2,0]} style={{pointerEvents:'none'}}><span className="rounded bg-card px-1 text-xs shadow-soft">{state==='locked'?'🔒':state==='knock'?'✋':'🚪'}</span></Html>}</group>;
+      const state=props.doors?.[key as RoomKey]?.state ?? 'open'; const [x,,z]=map({x:(d.x0+d.x1)/2,y:d.wallY});
+      return <group key={key}><Box position={[x,0.035,z]} size={[(layoutPoint({x:d.x1,y:d.wallY},spaceStyle).x-layoutPoint({x:d.x0,y:d.wallY},spaceStyle).x)/100,0.04,0.16]} color={palette.wood} />{key.startsWith('bedroom') && <Html center position={[x,0.2,z]} zIndexRange={[2,0]} style={{pointerEvents:'none'}}><span className="rounded bg-card px-1 text-xs shadow-soft">{state==='locked'?'🔒':state==='knock'?'✋':'🚪'}</span></Html>}</group>;
     })}
     <Box position={[-2.6,0.04,2.03]} size={[3.7,0.025,1.9]} color={palette.sage} />
     <Box position={[-2.7,0.04,-1.6]} size={[1.8,0.025,1.4]} color={palette.lavender} />
@@ -138,7 +139,7 @@ function Scene({ props, palette, reset, spaceStyle }: { props: FloorPlanProps; p
     <pointLight position={[-0.5,1.5,2.8]} intensity={0.8} distance={3} color={palette['scene-light'] ?? palette.card} />
     <Suspense fallback={null}><WorkplaceFurniture key={spaceStyle} style={spaceStyle} /><AssetsReady /></Suspense>
     {props.settings?.map(s=><Suspense key={s.room_key} fallback={null}><DecorPlant room={s.room_key} decor={s.decor} /></Suspense>)}
-    {props.avatars.map(a=><Avatar key={a.id} avatar={a} onClick={props.onAvatarClick} palette={palette} />)}
+    {props.avatars.map(a=><Avatar key={a.id} avatar={a} onClick={props.onAvatarClick} palette={palette} spaceStyle={spaceStyle} />)}
     <OrbitControls ref={controls} enablePan={false} enableZoom={false} minPolarAngle={0.2} maxPolarAngle={Math.PI/2.5} enableDamping />
   </>;
 }

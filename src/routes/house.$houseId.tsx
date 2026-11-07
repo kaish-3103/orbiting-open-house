@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/orbit/Logo";
 import { type PlanAvatar } from "@/components/orbit/FloorPlan";
 import { HouseView } from "@/components/orbit/HouseView";
+import type { SpaceStyle } from '@/lib/layout';
+import { RoomMusic } from '@/components/orbit/RoomMusic';
 import { VideoTile } from "@/components/orbit/VideoTile";
 import { HouseCompanion } from '@/components/orbit/HouseCompanion';
 import { ScreenSharing } from '@/components/orbit/ScreenSharing';
@@ -48,6 +50,7 @@ function House() {
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const [roomSettings, setRoomSettings] = useState<Experience['settings']>([]);
   const [houseName, setHouseName] = useState("");
+  const [layout,setLayout]=useState<SpaceStyle>('loft');
   const [members, setMembers] = useState<Member[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
   const [grants, setGrants] = useState<{ room_key: string; user_id: string }[]>([]);
@@ -92,9 +95,10 @@ function House() {
       try {
       const uid = await ensureGuest();
       setMe(uid);
-      const { data: h } = await supabase.from("houses").select("name").eq("id", houseId).maybeSingle();
+      const { data: h } = await supabase.from("houses").select("name,layout_key").eq("id", houseId).maybeSingle();
       if (!h) { setDenied(true); return; }
       setHouseName(h.name);
+      setLayout(h.layout_key==='lounge'||h.layout_key==='office'?h.layout_key:'loft');
       const { data: inv } = await supabase.from("house_invites").select("token").eq("house_id", houseId).eq("revoked", false).limit(1).maybeSingle();
       setInvite(inv?.token ?? null);
       await Promise.all([loadDoors(), loadMembers()]);
@@ -334,7 +338,7 @@ function House() {
       <div className="relative flex min-h-0 flex-1">
         <main className="relative flex min-w-0 flex-1 items-center justify-center">
           <div className="h-full min-h-48 w-full">
-            <HouseView avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} onAvatarClick={setSelectedPerson} settings={roomSettings} highlight={myRoom} />
+            <HouseView spaceStyle={layout} avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} onAvatarClick={setSelectedPerson} settings={roomSettings} highlight={myRoom} />
           </div>
           <div className="pointer-events-none absolute top-6 left-1/2 max-w-[90%] -translate-x-1/2 rounded-full bg-chrome px-4 py-1.5 text-center text-sm text-chrome-foreground shadow-float">
             {myRoom ? ROOMS[myRoom].label : "…"} · {media.voiceRoom ? <span className="text-live">Voice connected</span> : media.voiceState === "error" ? "Voice failed" : autoVoice ? (myRoom === "hallway" ? "No voice in the hallway" : media.voiceState === "connecting" ? "Connecting voice…" : "Voice unavailable") : "Voice off"}
@@ -371,6 +375,7 @@ function House() {
 
       {me && doorsLoaded && <HouseCompanion houseId={houseId} me={me} room={myRoom} people={members} peers={peers} selected={selectedPerson} select={setSelectedPerson} move={moveTo} owner={!!myDoorKey} onSettings={setRoomSettings} />}
       {me && doorsLoaded && <ScreenSharing houseId={houseId} room={myRoom} />}
+      {me && doorsLoaded && <RoomMusic houseId={houseId} me={me} room={myRoom} people={members} />}
       <Audience houseId={houseId} room={myRoom} connected={media.voiceState === 'connected'} mic={media.micPublished} voiceOn={autoVoice} />
       <footer className="flex flex-wrap items-center justify-center gap-2 border-t bg-card px-4 py-3">
         <Button disabled={media.cameraBusy || media.state !== "ready"} variant={media.cameraPublished ? "default" : "outline"} className="rounded-full" onClick={toggleCam}>{media.cameraPublished ? <Camera className="mr-1 h-4 w-4" /> : <CameraOff className="mr-1 h-4 w-4" />}{media.cameraBusy ? "Camera…" : media.cameraPublished ? "Camera on" : "Camera off"}</Button>

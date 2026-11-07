@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { Box3, Vector3, type Mesh } from 'three';
 import desk from '@/assets/models/desk.glb.asset.json';
@@ -22,7 +22,8 @@ import kitchenCoffeeMachine from '@/assets/models/kitchenCoffeeMachine.glb.asset
 import kitchenFridge from '@/assets/models/kitchenFridge.glb.asset.json';
 import chair from '@/assets/models/chair.glb.asset.json';
 import { planToWorld } from '@/lib/house-scene';
-import type { SpaceStyle } from './HouseView';
+import { layoutPoint, type SpaceStyle } from '@/lib/layout';
+const LayoutContext=createContext<SpaceStyle>('loft');
 
 const models = { desk, chairDesk, computerScreen, computerKeyboard, computerMouse, bedDouble, bookcaseOpen, books, loungeSofa, loungeChair, tableCoffee, tableRound, pottedPlant, lampRoundFloor, lampRoundTable, kitchenCabinet, kitchenSink, kitchenCoffeeMachine, kitchenFridge, chair };
 
@@ -39,7 +40,7 @@ export function Furniture({ kind, x, y, width, elevation = 0, rotation = 0 }: { 
     clone.traverse(child => { if ((child as Mesh).isMesh) { child.castShadow = true; child.receiveShadow = true; } });
     return clone;
   }, [scene, width]);
-  const [wx, , wz] = planToWorld({ x, y });
+  const [wx, , wz] = planToWorld(layoutPoint({x,y},useContext(LayoutContext)));
   return <group position={[wx, elevation, wz]} rotation-y={rotation}><primitive object={object} /></group>;
 }
 
@@ -55,7 +56,8 @@ function Workstation({ x, y }: { x: number; y: number }) {
   </>;
 }
 
-export function WorkplaceFurniture({style='loft'}:{style?:SpaceStyle}) {
+export function WorkplaceFurniture({style='loft'}:{style?:SpaceStyle}) { return <LayoutContext.Provider value={style}><FurnitureLayout style={style} /></LayoutContext.Provider>; }
+function FurnitureLayout({style}:{style:SpaceStyle}) {
   if(style==='office') return <group>
     {[[180,120],[420,120],[770,120],[1010,120],[180,500],[425,500]].map(([x,y],i)=><Workstation key={i} x={x ?? 0} y={y ?? 0} />)}
     {[[85,275],[565,270],[660,270],[1120,270],[575,665]].map(([x,y],i)=><Furniture key={i} kind="kitchenCabinet" x={x ?? 0} y={y ?? 0} width={0.62} />)}

@@ -57,6 +57,13 @@
       "when": 1794090383712,
       "tag": "0007_atomic_media_cleanup_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794093197221,
+      "tag": "0008_immutable_layout_and_room_music",
+      "breakpoints": true
     }
   ]
 }

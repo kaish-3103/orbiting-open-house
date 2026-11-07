@@ -124,6 +124,7 @@ export type Database = {
           motion_id: string
           motion_ready_at: string
           path: Json
+          room_entered_at: string
           room_key: string | null
           status: string
           updated_at: string
@@ -138,6 +139,7 @@ export type Database = {
           motion_id?: string
           motion_ready_at?: string
           path?: Json
+          room_entered_at?: string
           room_key?: string | null
           status?: string
           updated_at?: string
@@ -152,6 +154,7 @@ export type Database = {
           motion_id?: string
           motion_ready_at?: string
           path?: Json
+          room_entered_at?: string
           room_key?: string | null
           status?: string
           updated_at?: string
@@ -350,6 +353,7 @@ export type Database = {
           created_by: string
           creation_request: string | null
           id: string
+          layout_key: string
           name: string
           template: string
         }
@@ -358,6 +362,7 @@ export type Database = {
           created_by: string
           creation_request?: string | null
           id?: string
+          layout_key?: string
           name: string
           template?: string
         }
@@ -366,6 +371,7 @@ export type Database = {
           created_by?: string
           creation_request?: string | null
           id?: string
+          layout_key?: string
           name?: string
           template?: string
         }
@@ -428,6 +434,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "room_messages_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_music: {
+        Row: {
+          controller_id: string | null
+          house_id: string
+          playing: boolean
+          requests: Json
+          room_key: string
+          started_at: string
+          track: string
+        }
+        Insert: {
+          controller_id?: string | null
+          house_id: string
+          playing?: boolean
+          requests?: Json
+          room_key: string
+          started_at?: string
+          track?: string
+        }
+        Update: {
+          controller_id?: string | null
+          house_id?: string
+          playing?: boolean
+          requests?: Json
+          room_key?: string
+          started_at?: string
+          track?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_music_house_id_fkey"
             columns: ["house_id"]
             isOneToOne: false
             referencedRelation: "houses"
@@ -526,6 +570,16 @@ export type Database = {
         Args: { _color: string; _display_name: string; _name: string }
         Returns: string
       }
+      create_house_layout: {
+        Args: {
+          _color: string
+          _display_name: string
+          _layout: string
+          _name: string
+          _request_id: string
+        }
+        Returns: string
+      }
       create_house_once: {
         Args: {
           _color: string
@@ -584,6 +638,10 @@ export type Database = {
       }
       orbit_experience: {
         Args: { _action: string; _house: string; _payload?: Json }
+        Returns: Json
+      }
+      orbit_music: {
+        Args: { _action?: string; _house: string; _payload?: Json }
         Returns: Json
       }
       orbit_room: { Args: { _x: number; _y: number }; Returns: string }

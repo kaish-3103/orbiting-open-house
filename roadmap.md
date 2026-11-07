@@ -1,7 +1,8 @@
 # Orbit roadmap
 - [x] Current request: detailed interactive 3D workplace house; joined-house walking/profile and desktop/phone verified
 - [x] Added request: selectable lounge and cooperative office visual styles with cabinets; desktop/phone checked (local appearance, shared geometry unchanged)
-- [ ] Added request: room music (jazz, rain, classical, instrumental), first-arrival controller and request/grant access; not implemented in this visual update
+- [ ] Current request: shared jazz/rain/classical/instrumental music; first-arrival control with request/approve transfer, authorization and tests
+- [ ] Current request: genuinely different house layouts selected during creation, persisted/immutable for all visitors; remove in-house selector
 - [x] Current request: Muted explicitly connects room voice and unmutes; serialized publication/mute, failure rollback and tested retry
 - [x] Current request: atomic stale-lease claims, fair bounded cleanup batches, retry and newer-session isolation; 44 regressions passed
 - [ ] Current request: operational autonomous removal verification (blocked: callback remains unpublished by user requirement; credential rotation and real provider/device acceptance needed)

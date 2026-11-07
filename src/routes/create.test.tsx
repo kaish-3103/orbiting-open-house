@@ -26,7 +26,8 @@ describe("house creation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry safely" }));
     await waitFor(() => expect(mocks.nav).toHaveBeenCalledWith({ to: "/house/$houseId", params: { houseId: "same-house" } }));
     expect(mocks.rpc.mock.calls[0]?.[1]._request_id).toBe(mocks.rpc.mock.calls[1]?.[1]._request_id);
-    expect(mocks.rpc.mock.calls[0]?.[0]).toBe("create_house_once");
+    expect(mocks.rpc.mock.calls[0]?.[0]).toBe("create_house_layout");
+    expect(mocks.rpc.mock.calls[0]?.[1]._layout).toBe('loft');
     view.unmount();
   });
   it("clears busy on guest failure without creating a house", async () => {

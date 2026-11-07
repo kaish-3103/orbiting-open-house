@@ -8,6 +8,7 @@ import { ColorPicker } from "@/components/orbit/IdentityPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureGuest } from "@/lib/guest";
 import { bounded } from "@/lib/async-operation";
+import { LAYOUTS, type SpaceStyle } from '@/lib/layout';
 
 export const Route = createFileRoute("/create")({
   head: () => ({
@@ -23,17 +24,12 @@ export const Route = createFileRoute("/create")({
   component: Create,
 });
 
-const templates = [
-  { id: "founders_loft", name: "The Founders' Loft", body: "Two bedrooms, a lounge, a kitchen and a hallway.", ready: true },
-  { id: "cozy", name: "The Cozy Apartment", body: "Coming soon", ready: false },
-  { id: "studio", name: "The Modern Studio", body: "Coming soon", ready: false },
-];
-
 function Create() {
   const nav = useNavigate();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [color, setColor] = useState("sage");
+  const [layout,setLayout]=useState<SpaceStyle>('loft');
   const [house, setHouse] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -51,7 +47,7 @@ function Create() {
         request.current = sessionStorage.getItem("orbit-create-request") ?? crypto.randomUUID();
         sessionStorage.setItem("orbit-create-request", request.current);
       }
-      const { data, error } = await bounded(supabase.rpc("create_house_once", { _name: house, _display_name: name, _color: color, _request_id: request.current }), "Creating your house is taking too long. Check your connection and retry; retrying won't create a second house.");
+      const { data, error } = await bounded(supabase.rpc("create_house_layout", { _name: house, _display_name: name, _color: color, _request_id: request.current, _layout:layout }), "Creating your house is taking too long. Check your connection and retry; retrying won't create a second house.");
       if (error) throw error;
       if (!data) throw new Error("The house wasn't confirmed. Please retry.");
       await nav({ to: "/house/$houseId", params: { houseId: data } });
@@ -71,13 +67,8 @@ function Create() {
     { title: "Pick your avatar", ok: true, body: <ColorPicker value={color} onChange={setColor} /> },
     { title: "Choose a house", ok: true, body: (
       <div className="grid gap-3">
-        {templates.map((t) => (
-          <div key={t.id} className={`rounded-2xl border p-4 ${t.ready ? "border-primary bg-accent/40" : "opacity-60"}`}>
-            <div className="flex items-center justify-between"><span className="font-semibold">{t.name}</span>
-              {!t.ready && <span className="rounded-full bg-muted px-2 py-0.5 text-xs">Coming soon</span>}</div>
-            <p className="text-sm text-muted-foreground">{t.body}</p>
-          </div>
-        ))}
+        {LAYOUTS.map(t=><Button key={t.id} type="button" variant={layout===t.id?'default':'outline'} aria-pressed={layout===t.id} className="h-auto items-start flex-col whitespace-normal p-4 text-left" onClick={()=>setLayout(t.id)}><span className="font-semibold">{t.name}</span><span className="text-sm font-normal">{t.description}</span></Button>)}
+        <p className="text-sm text-muted-foreground">This house’s layout is permanent once created.</p>
       </div>) },
     { title: "Name your house", ok: house.trim().length > 0, body: <Input autoFocus value={house} maxLength={60} onChange={(e) => setHouse(e.target.value)} placeholder="e.g. The Launchpad" className="h-12 text-lg" /> },
   ];
