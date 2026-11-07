@@ -266,8 +266,12 @@ function House() {
     setCamOn((c) => !c);
   }
   function toggleMic() {
-    if (!autoVoice) { toast("Turn on auto-connect voice first"); return; }
-    if (!media.voiceRoom) { toast("Connect to voice in a room first"); return; }
+    if (!myRoom || myRoom === 'hallway' || access(myRoom) !== 'ok') { toast("Enter an available room to use your microphone"); return; }
+    if (media.state === 'unconfigured') { toast("Voice isn't set up for this house yet"); return; }
+    // Clicking Muted is the explicit choice to connect AND publish; no separate
+    // auto-connect prerequisite. The hook waits for authenticated room activation.
+    if (!autoVoice) { setAutoVoice(true); setMicOn(true); return; }
+    if (!media.voiceRoom) { media.retryVoice(); setMicOn(true); return; }
     setMicOn((m) => !m);
   }
   function changeStatus(s: Status) {
@@ -369,7 +373,7 @@ function House() {
       <Audience houseId={houseId} room={myRoom} connected={media.voiceState === 'connected'} mic={media.micPublished} voiceOn={autoVoice} />
       <footer className="flex flex-wrap items-center justify-center gap-2 border-t bg-card px-4 py-3">
         <Button disabled={media.cameraBusy || media.state !== "ready"} variant={media.cameraPublished ? "default" : "outline"} className="rounded-full" onClick={toggleCam}>{media.cameraPublished ? <Camera className="mr-1 h-4 w-4" /> : <CameraOff className="mr-1 h-4 w-4" />}{media.cameraBusy ? "Camera…" : media.cameraPublished ? "Camera on" : "Camera off"}</Button>
-        <Button disabled={media.micBusy || !media.voiceRoom} variant={media.micPublished ? "default" : "outline"} className="rounded-full" onClick={toggleMic}>{media.micPublished ? <Mic className="mr-1 h-4 w-4" /> : <MicOff className="mr-1 h-4 w-4" />}{media.micBusy ? "Mic…" : media.micPublished ? "Mic on" : "Muted"}</Button>
+        <Button aria-label={media.micPublished ? 'Mute microphone' : 'Unmute microphone'} aria-pressed={media.micPublished} disabled={media.micBusy || media.voiceState === 'connecting' || !me || !doorsLoaded} title={myRoom === 'hallway' ? 'Enter a room to talk' : media.micPublished ? 'Mute your microphone' : 'Connect to room voice and unmute'} variant={media.micPublished ? "default" : "outline"} className="rounded-full" onClick={toggleMic}>{media.micPublished ? <Mic className="mr-1 h-4 w-4" /> : <MicOff className="mr-1 h-4 w-4" />}{media.micBusy ? "Mic…" : media.voiceState === 'connecting' && micOn ? 'Connecting mic…' : media.micPublished ? "Mic on" : "Muted"}</Button>
         <Button variant={autoVoice ? "default" : "outline"} className="rounded-full" onClick={toggleAutoVoice}><Radio className="mr-1 h-4 w-4" />Auto-connect voice {autoVoice ? "on" : "off"}</Button>
         <select value={status} onChange={(e) => changeStatus(e.target.value as Status)} className="h-9 rounded-full border bg-background px-3 text-sm" aria-label="Availability">
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}

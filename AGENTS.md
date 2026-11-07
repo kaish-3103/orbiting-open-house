@@ -38,4 +38,5 @@ use the editor.
 - Voice transitions use the serialized VoiceSession queue; await server removal before joining with the same identity, and keep teardown failures blocking retries.
 - Media presence reflects confirmed publications, not requested toggles; avatar videos attach/detach the same tracks as the dock.
 - Focus, visits, social signals, chat and decoration mutate only through authenticated atomic experience RPCs; server deadlines synchronize timers and current-room authorization restricts message reads.
-- Autonomous media cleanup uses the generated cron authenticator and managed minute schedule; deployment and provider acceptance must be verified before calling cleanup operational.
+- Autonomous media cleanup uses generated cron authentication and a managed minute schedule; claim/revoke stale leases atomically under the same house lock as renewal, rotate retry attempts and remove only lease-specific identities. Deployment/provider acceptance remains required before calling it operational.
+- Microphone publication requests serialize per voice connection; explicit Muted clicks may connect and unmute, while reconnection and voice retry reset to muted.

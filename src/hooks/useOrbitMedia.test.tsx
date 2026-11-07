@@ -8,7 +8,7 @@ vi.mock("livekit-client", () => {
   class Room {
     handlers = new Map<string, Function[]>();
     remoteParticipants = new Map();
-    localParticipant = { identity: "me", isCameraEnabled: false, isMicrophoneEnabled: false, getTrackPublication: () => undefined, setCameraEnabled: vi.fn(async () => {}), setMicrophoneEnabled: vi.fn(async () => {}) };
+    localParticipant = { identity: "me", isCameraEnabled: false, isMicrophoneEnabled: false, getTrackPublication: () => undefined, setCameraEnabled: vi.fn(async () => {}), setMicrophoneEnabled: vi.fn(async (on: boolean) => { this.localParticipant.isMicrophoneEnabled = on; }) };
     constructor() { mocks.rooms.push(this); }
     on(event: string, fn: Function) { this.handlers.set(event, [...(this.handlers.get(event) ?? []), fn]); return this; }
     emit(event: string, value?: unknown) { this.handlers.get(event)?.forEach((fn) => fn(value)); }
@@ -21,6 +21,20 @@ import { useOrbitMedia } from "./useOrbitMedia";
 const options = () => ({ houseId: "house", myRoom: "lounge" as const, autoVoice: true, micOn: false, camOn: false, allowedRooms: () => true, onCameraFailed: vi.fn(), onMicFailed: vi.fn() });
 afterEach(() => { vi.clearAllMocks(); mocks.rooms.length = 0; });
 describe("confirmed media state", () => {
+  it('explicit unmute connects voice from off, then mute stops actual publication', async () => {
+    mocks.token.mockResolvedValue({ configured: true, url: 'wss://test.invalid', token: 'test', leaseId: 'lease' }); mocks.leave.mockResolvedValue({ ok: true });
+    const props = { ...options(), autoVoice: false };
+    const { result, rerender, unmount } = renderHook(p => useOrbitMedia(p), { initialProps: props });
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(mocks.rooms).toHaveLength(1);
+    rerender({ ...props, autoVoice: true, micOn: true });
+    await waitFor(() => expect(mocks.rooms).toHaveLength(2));
+    const room = mocks.rooms[1]; room.localParticipant.setMicrophoneEnabled.mockImplementation(async (on: boolean) => { room.localParticipant.isMicrophoneEnabled = on; });
+    await waitFor(() => expect(result.current.micPublished).toBe(true));
+    rerender({ ...props, autoVoice: true, micOn: false });
+    await waitFor(() => expect(result.current.micPublished).toBe(false));
+    expect(room.localParticipant.isMicrophoneEnabled).toBe(false); unmount();
+  });
   it("rolls failed camera and mic requests back and supports retry", async () => {
     mocks.token.mockResolvedValue({ configured: true, url: "wss://test.invalid", token: "test", leaseId: "test-lease" }); mocks.leave.mockResolvedValue({ ok: true });
     const props = options(); const { result, rerender, unmount } = renderHook((p) => useOrbitMedia(p), { initialProps: props });

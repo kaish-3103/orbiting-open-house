@@ -469,6 +469,7 @@ export type Database = {
       }
       voice_leases: {
         Row: {
+          cleanup_attempt_at: string | null
           expires_at: string
           house_id: string
           id: string
@@ -481,6 +482,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cleanup_attempt_at?: string | null
           expires_at?: string
           house_id: string
           id?: string
@@ -493,6 +495,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cleanup_attempt_at?: string | null
           expires_at?: string
           house_id?: string
           id?: string
@@ -552,6 +555,28 @@ export type Database = {
       orbit_action: {
         Args: { _action: string; _house: string; _payload?: Json }
         Returns: Json
+      }
+      orbit_claim_media_cleanup: {
+        Args: { _house?: string; _limit?: number }
+        Returns: {
+          cleanup_attempt_at: string | null
+          expires_at: string
+          house_id: string
+          id: string
+          is_sharer: boolean
+          media_kind: string
+          removed: boolean
+          revoked: boolean
+          room_key: string
+          token_expires_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "voice_leases"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       orbit_current: {
         Args: { _house: string; _room: string; _user: string }

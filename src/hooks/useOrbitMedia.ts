@@ -7,6 +7,7 @@ import { bounded } from "@/lib/async-operation";
 import { VoiceSession } from "@/lib/voice-session";
 import { checkVoiceLease } from "@/lib/voice-access.functions";
 import { useServerFn } from "@tanstack/react-start";
+import { MicrophoneController } from '@/lib/microphone';
 
 type Opts = { houseId: string; enabled?: boolean; myRoom: RoomKey | null; autoVoice: boolean; micOn: boolean; camOn: boolean; allowedRooms: (r: RoomKey) => boolean; onCameraFailed: () => void; onMicFailed: () => void };
 export type MediaState = "loading" | "unconfigured" | "ready" | "error";
@@ -29,6 +30,12 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
   const videoRoom = useRef<Room | null>(null);
   const voice = useRef<Room | null>(null);
   const session = useRef<VoiceSession<RoomKey> | null>(null);
+  const microphones = useRef(new WeakMap<Room, MicrophoneController>());
+  const micController = (room: Room) => {
+    let controller = microphones.current.get(room);
+    if (!controller) { controller = new MicrophoneController(on => room.localParticipant.setMicrophoneEnabled(on)); microphones.current.set(room, controller); }
+    return controller;
+  };
   const callbacks = useRef({ onCameraFailed, onMicFailed });
   callbacks.current = { onCameraFailed, onMicFailed };
 
@@ -117,7 +124,7 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
       room.on(lk.RoomEvent.Reconnected, () => {
         void bounded(checkFn({ data: { houseId, leaseId: res.leaseId } }), "Voice permission timed out").then(async (result) => {
           if (!result.ok || !current() || disposed) { await disconnect(); await remove(); return; }
-          await room.localParticipant.setMicrophoneEnabled(false);
+          await micController(room).set(false);
           setMicPublished(false); setVoiceRoom(key); setVoiceState("connected");
         }).catch(() => { void disconnect(); void remove(); });
       });
@@ -192,17 +199,18 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
     let failed = false;
     setMicBusy(true);
     if (micOn) setErrors((e) => ({ ...e, mic: undefined }));
-    const operation = room.localParticipant.setMicrophoneEnabled(micOn);
-    operation.then(() => { if (failed) void room.localParticipant.setMicrophoneEnabled(false).catch(() => {}); }, () => {});
+    const controller = micController(room);
+    const operation = controller.set(micOn);
+    operation.then(() => { if (failed) void controller.set(false).catch(() => {}); }, () => {});
     bounded(operation, "Microphone timed out").then(() => {
       if (!cancelled) setMicPublished(room.localParticipant.isMicrophoneEnabled);
     }).catch(() => {
       failed = true;
       if (!cancelled) { setMicPublished(false); callbacks.current.onMicFailed(); setErrors((e) => ({ ...e, mic: "Microphone couldn't start. Check browser permission and try Mic again." })); }
-      void room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+      void controller.set(false).catch(() => {});
     }).finally(() => { if (!cancelled) setMicBusy(false); });
     return () => { cancelled = true; };
   }, [micOn, voiceRoom]);
 
-  return { state, videos, voiceRoom, voiceState, speakers, cameraPublished, micPublished, cameraBusy, micBusy, errors, retryVoice: () => setVoiceRetryId((n) => n + 1), retryVideo: () => setVideoRetryId((n) => n + 1) };
+  return { state, videos, voiceRoom, voiceState, speakers, cameraPublished, micPublished, cameraBusy, micBusy, errors, retryVoice: () => { callbacks.current.onMicFailed(); setVoiceRetryId((n) => n + 1); }, retryVideo: () => setVideoRetryId((n) => n + 1) };
 }

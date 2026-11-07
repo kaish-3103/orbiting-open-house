@@ -1,4 +1,7 @@
 # Orbit roadmap
+- [x] Current request: Muted explicitly connects room voice and unmutes; serialized publication/mute, failure rollback and tested retry
+- [x] Current request: atomic stale-lease claims, fair bounded cleanup batches, retry and newer-session isolation; 44 regressions passed
+- [ ] Current request: operational autonomous removal verification (blocked: callback remains unpublished by user requirement; credential rotation and real provider/device acceptance needed)
 - [x] Phase 1: personal/shared server-deadline focus timers, presets/custom durations, controls; accessible avatar cards/current visits
 - [x] Phase 2: recent houses with membership recheck/forget; listener indicator code; DND-aware signals; persisted restricted chat
 - [x] Phase 3: room-only screen code and leases; owner customization; dismissible onboarding; phone checks
