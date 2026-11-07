@@ -1,11 +1,20 @@
 # Orbit review
 
+## Shared music and permanent layouts — November 7
+- Creation now offers Loft, Social Lounge and Cooperative Office. Database layout is fixed after insertion; uncertain retries return the original house without changing it. Existing houses default to Loft. Visitors have no layout switch.
+- Layouts now reshape room widths/depths, corridor placement, walls and door openings, not only colors. Reversible transforms map furniture, avatars and clicks to the unchanged server-authorized room graph. Lounge emphasizes the lower social floor; Office deepens cabins and compacts meeting areas. These are different proportions of the same five-room connectivity, not new permission graphs.
+- Four original synthesized 48-second loops (jazz-inspired, rain, classical-style and instrumental) are bundled locally. No third-party commercial songs. Room controller chooses track and shared play/pause; each person explicitly listens and controls their own volume.
+- Authenticated RPCs select the earliest currently authorized arrival, retain control until transfer/departure, handle requests and approval/decline, and reject non-controller changes. Departure/revocation clears control; remaining participants elect the earliest arrival. Closed browsers expire from current presence after 30 seconds. Pending requests expire after two minutes.
+- Playback uses server start timestamps and stops/clears when room lookup fails or the user leaves. Shared pause currently stops playback; play restarts the loop (not resume at saved offset).
+- Two independent browser identities created/joined by code, moved using authenticated movement/arrival, played rain with actual audio-element progress, rejected a guest's forged track change, requested/transferred control, changed to jazz, and verified departure denial and controller fallback. Phone width fitted and no page errors occurred. Media camera transport displayed a connection failure; webcam/voice remains unverified and unchanged.
+- Focused tests cover coordinate inversion/different proportions, four-track validation, late-listener loop position and owner-selected creation/retry. Build/typecheck: OK. Browser audio playback verified, but listening quality on physical speakers/headphones is not verified. No publication or secret access.
+
 ## 3D visual update
 - Added real interactive Three.js rendering, CC0 furniture models, wood floor detail, windows, warm lights and shadows. The original server geometry/doors remain unchanged.
-- Loft, Lounge and Office selectors change local visual appearance; these are not new independently authorized rooms or shared house templates. Lounge has four seating clusters; Office has six workstations, meeting seating and cabinets.
+- Original local style selectors were superseded by the permanent creation-time layouts described above.
 - Verified joined-house avatar profile, actual canvas walking into Lounge with server readback, reset control and phone width. Software WebGL made walking slow; device frame rate remains unverified. Check the preview on your device, rotate the house and walk between rooms.
 - Ten focused geometry, coordinate mapping and avatar tests passed. Automatic build/typecheck reports build OK. Both new styles rendered without page errors, including phone selector checks.
-- Newly requested shared music is recorded but not implemented in this visual update; it still needs authoritative first-arrival control, request/grant handling and audio selections.
+- Shared music has now been implemented as described above.
 - No publication or credential inspection/change.
 
 ## Delivered

@@ -12,6 +12,16 @@ function fillSteps() {
 }
 describe("house creation", () => {
   beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); });
+  it('sends the owner-selected office layout when creating the house',async()=>{
+    mocks.guest.mockResolvedValue('guest');mocks.rpc.mockResolvedValue({data:'office-house',error:null});
+    const Component=Route.options.component;if(!Component)throw new Error('missing component');
+    const view=render(<Component />);
+    fireEvent.change(screen.getByPlaceholderText('Your name'),{target:{value:'Owner'}});
+    fireEvent.click(screen.getByRole('button',{name:'Continue'}));fireEvent.click(screen.getByRole('button',{name:'Continue'}));
+    fireEvent.click(screen.getByRole('button',{name:/Cooperative Office/}));fireEvent.click(screen.getByRole('button',{name:'Continue'}));
+    fireEvent.change(screen.getByPlaceholderText('e.g. The Launchpad'),{target:{value:'Office'}});fireEvent.click(screen.getByRole('button',{name:'Enter the house'}));
+    await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith('create_house_layout',expect.objectContaining({_layout:'office'})));view.unmount();
+  });
   it("waits for guest auth and reuses the request ID on uncertain failure", async () => {
     let signIn: (id: string) => void = () => {};
     mocks.guest.mockReturnValue(new Promise<string>((resolve) => { signIn = resolve; }));
