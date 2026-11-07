@@ -1,5 +1,13 @@
 # Orbit review
 
+## 3D visual update
+- Added real interactive Three.js rendering, CC0 furniture models, wood floor detail, windows, warm lights and shadows. The original server geometry/doors remain unchanged.
+- Loft, Lounge and Office selectors change local visual appearance; these are not new independently authorized rooms or shared house templates. Lounge has four seating clusters; Office has six workstations, meeting seating and cabinets.
+- Verified joined-house avatar profile, actual canvas walking into Lounge with server readback, reset control and phone width. Software WebGL made walking slow; device frame rate remains unverified. Check the preview on your device, rotate the house and walk between rooms.
+- Ten focused geometry, coordinate mapping and avatar tests passed. Automatic build/typecheck reports build OK. Both new styles rendered without page errors, including phone selector checks.
+- Newly requested shared music is recorded but not implemented in this visual update; it still needs authoritative first-arrival control, request/grant handling and audio selections.
+- No publication or credential inspection/change.
+
 ## Delivered
 - Preserved the existing visual design. Added create-or-join entry and a shared house code; existing invite links and bedroom door controls continue to work.
 - Camera tracks render inside moving circular avatars as well as the People dock.

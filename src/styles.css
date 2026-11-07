@@ -103,6 +103,14 @@
   --wood-dark: oklch(0.6 0.06 55);
   --fabric: oklch(0.6 0.05 262);
   --plant: oklch(0.6 0.1 150);
+  --scene-wall: oklch(0.94 0.014 85);
+  --scene-light: oklch(0.96 0.045 85);
+  --scene-grout: oklch(0.76 0.02 85);
+  --scene-lounge-floor: oklch(0.48 0.025 35);
+  --scene-lounge-wall: oklch(0.57 0.03 80);
+  --scene-lounge-rug: oklch(0.4 0.055 155);
+  --scene-office-floor: oklch(0.91 0.012 240);
+  --scene-office-wall: oklch(0.96 0.01 240);
 
   --shadow-soft: 0 20px 50px -24px color-mix(in oklab, var(--primary) 35%, transparent);
   --shadow-float: 0 10px 30px -12px color-mix(in oklab, var(--primary) 45%, transparent);

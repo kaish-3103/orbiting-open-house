@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/orbit/Logo";
-import { FloorPlan } from "@/components/orbit/FloorPlan";
+import { HouseView } from "@/components/orbit/HouseView";
 import { ArrowRight, Plus, KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -48,7 +48,7 @@ function Landing() {
             <span className="font-display text-lg">Founders’ Loft</span>
             <span className="flex items-center gap-2 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-live" />A place to be together</span>
           </div>
-          <div className="aspect-[1200/780] w-full"><FloorPlan avatars={demo} doors={{ bedroom1: { state: "knock", ownerName: "Maya" }, bedroom2: { state: "open", ownerName: "Jonas" } }} /></div>
+          <div className="aspect-[1200/780] w-full"><HouseView avatars={demo} doors={{ bedroom1: { state: "knock", ownerName: "Maya" }, bedroom2: { state: "open", ownerName: "Jonas" } }} /></div>
         </section>
       </main>
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">Orbit · a home for people who work apart</footer>

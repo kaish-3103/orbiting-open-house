@@ -5,7 +5,8 @@ import { Camera, CameraOff, ChevronDown, ChevronUp, DoorOpen, Hand, Link2, Lock,
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/orbit/Logo";
-import { FloorPlan, type PlanAvatar } from "@/components/orbit/FloorPlan";
+import { type PlanAvatar } from "@/components/orbit/FloorPlan";
+import { HouseView } from "@/components/orbit/HouseView";
 import { VideoTile } from "@/components/orbit/VideoTile";
 import { HouseCompanion } from '@/components/orbit/HouseCompanion';
 import { ScreenSharing } from '@/components/orbit/ScreenSharing';
@@ -331,9 +332,9 @@ function House() {
       </header>
 
       <div className="relative flex min-h-0 flex-1">
-        <main className="relative flex min-w-0 flex-1 items-center justify-center p-4">
-          <div className="aspect-[1200/780] max-h-full w-full max-w-full rounded-[2rem] bg-card p-2 shadow-soft" style={{ maxWidth: "calc((100vh - 190px) * 1200 / 780)" }}>
-            <FloorPlan avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} onAvatarClick={setSelectedPerson} settings={roomSettings} highlight={myRoom} />
+        <main className="relative flex min-w-0 flex-1 items-center justify-center">
+          <div className="h-full min-h-48 w-full">
+            <HouseView avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} onAvatarClick={setSelectedPerson} settings={roomSettings} highlight={myRoom} />
           </div>
           <div className="pointer-events-none absolute top-6 left-1/2 max-w-[90%] -translate-x-1/2 rounded-full bg-chrome px-4 py-1.5 text-center text-sm text-chrome-foreground shadow-float">
             {myRoom ? ROOMS[myRoom].label : "…"} · {media.voiceRoom ? <span className="text-live">Voice connected</span> : media.voiceState === "error" ? "Voice failed" : autoVoice ? (myRoom === "hallway" ? "No voice in the hallway" : media.voiceState === "connecting" ? "Connecting voice…" : "Voice unavailable") : "Voice off"}

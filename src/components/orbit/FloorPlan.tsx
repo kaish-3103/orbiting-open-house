@@ -16,7 +16,7 @@ export type PlanAvatar = {
   track?: Track | undefined;
 };
 
-type Props = {
+export type FloorPlanProps = {
   avatars: PlanAvatar[];
   doors?: Partial<Record<RoomKey, { state: DoorState; ownerName?: string | undefined }>>;
   onFloorClick?: (p: Pt) => void;
@@ -121,7 +121,7 @@ function DoorBadge({ room, state, ownerName }: { room: RoomKey; state: DoorState
   );
 }
 
-export function FloorPlan({ avatars, doors, onFloorClick, onAvatarClick, settings = [], highlight }: Props) {
+export function FloorPlan({ avatars, doors, onFloorClick, onAvatarClick, settings = [], highlight }: FloorPlanProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   function handleClick(e: MouseEvent<SVGSVGElement>) {

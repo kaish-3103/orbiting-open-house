@@ -31,6 +31,8 @@ use the editor.
 
 ## Orbit architecture
 - House geometry, pathing and door rules live in `src/lib/house.ts` (pure, unit-tested); the SVG plan only renders it.
+- The client-only 3D house maps the same authoritative plan coordinates through `house-scene`; furniture is visual only, and lazy loading preserves SSR and the SVG loading fallback.
+- Space style selection is local presentation, not room authorization; changing furniture must never change the server's room boundaries or access semantics.
 - Avatar movement and knocks use authenticated atomic RPCs and read-only activity/knock rows; animate server-generated paths locally and never write animation frames, because broadcast payloads have no trusted sender identity.
 - Media uses separate camera-only house, microphone-only voice and screen-only room transports; typed durable leases and unique identities isolate cleanup and keep private screens out of house video.
 - Guests are anonymous auth users; houses are joined only through `join_house(token)` RPC so house IDs alone grant nothing.
