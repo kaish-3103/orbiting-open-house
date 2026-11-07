@@ -1,9 +1,16 @@
 # Orbit roadmap
+- [x] Phase 1: personal/shared server-deadline focus timers, presets/custom durations, controls; accessible avatar cards/current visits
+- [x] Phase 2: recent houses with membership recheck/forget; listener indicator code; DND-aware signals; persisted restricted chat
+- [x] Phase 3: room-only screen code and leases; owner customization; dismissible onboarding; phone checks
+- [x] Foundation: authenticated cleanup endpoint and managed every-minute schedule prepared (not operationally verified)
+- [x] Delivery: 37 unit tests, two-identity browser feature/privacy flows, phone screenshots, review and device checklist
+- [ ] Provider acceptance: real voice/camera/screens/listeners and scheduled removal (blocked: user credential rotation, real devices, unpublished callback)
+- [ ] Complete exhaustive edge-case acceptance for host takeover, expiry, rate limits and screen reconnect (blocked: provider/device verification for media; non-media cases not yet exercised)
 - [x] Server-authorized rooms, atomic door/grant revocation and session-scoped voice access
 - [x] Authenticated movement/presence/knocks instead of trusted broadcast payloads
 - [x] Separate voice/video recovery and cover stale cleanup/reconnect/device failures
 - [x] Privacy regression tests, two-identity browser flows, phone checks and precise review report
-- [ ] Autonomous provider cleanup and real-device privacy/media acceptance (blocked: credential rotation and live-provider/device verification; client-driven removal is not an autonomous guarantee)
+- [ ] Autonomous provider cleanup operational verification (blocked: unpublished callback and credential rotation; schedule and handler exist, no live removal claim)
 - [x] Enlarge avatars and refresh the front page with a larger centered logo; checked desktop/mobile, entry buttons and 8 regression tests
 - [x] Landing, onboarding, invite join, guest identities
 - [x] Founders' Loft plan, click-to-move, realtime presence, room detection

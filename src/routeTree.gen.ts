@@ -14,6 +14,7 @@ import { Route as CreateRouteImport } from './routes/create'
 import { Route as EnterRouteImport } from './routes/enter'
 import { Route as HouseHouseIdRouteImport } from './routes/house.$houseId'
 import { Route as JoinTokenRouteImport } from './routes/join.$token'
+import { Route as ApiPublicJobsMediaCleanupRouteImport } from './routes/api/public/jobs/media-cleanup'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,12 @@ const JoinTokenRoute = JoinTokenRouteImport.update({
   path: '/join/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsMediaCleanupRoute =
+  ApiPublicJobsMediaCleanupRouteImport.update({
+    id: '/api/public/jobs/media-cleanup',
+    path: '/api/public/jobs/media-cleanup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +54,7 @@ export interface FileRoutesByFullPath {
   '/enter': typeof EnterRoute
   '/house/$houseId': typeof HouseHouseIdRoute
   '/join/$token': typeof JoinTokenRoute
+  '/api/public/jobs/media-cleanup': typeof ApiPublicJobsMediaCleanupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +62,7 @@ export interface FileRoutesByTo {
   '/enter': typeof EnterRoute
   '/house/$houseId': typeof HouseHouseIdRoute
   '/join/$token': typeof JoinTokenRoute
+  '/api/public/jobs/media-cleanup': typeof ApiPublicJobsMediaCleanupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,14 +71,33 @@ export interface FileRoutesById {
   '/enter': typeof EnterRoute
   '/house/$houseId': typeof HouseHouseIdRoute
   '/join/$token': typeof JoinTokenRoute
+  '/api/public/jobs/media-cleanup': typeof ApiPublicJobsMediaCleanupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/create' | '/enter' | '/house/$houseId' | '/join/$token'
+  fullPaths:
+    | '/'
+    | '/create'
+    | '/enter'
+    | '/house/$houseId'
+    | '/join/$token'
+    | '/api/public/jobs/media-cleanup'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/create' | '/enter' | '/house/$houseId' | '/join/$token'
+  to:
+    | '/'
+    | '/create'
+    | '/enter'
+    | '/house/$houseId'
+    | '/join/$token'
+    | '/api/public/jobs/media-cleanup'
   id:
-    '__root__' | '/' | '/create' | '/enter' | '/house/$houseId' | '/join/$token'
+    | '__root__'
+    | '/'
+    | '/create'
+    | '/enter'
+    | '/house/$houseId'
+    | '/join/$token'
+    | '/api/public/jobs/media-cleanup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -78,6 +106,7 @@ export interface RootRouteChildren {
   EnterRoute: typeof EnterRoute
   HouseHouseIdRoute: typeof HouseHouseIdRoute
   JoinTokenRoute: typeof JoinTokenRoute
+  ApiPublicJobsMediaCleanupRoute: typeof ApiPublicJobsMediaCleanupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -117,6 +146,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JoinTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/media-cleanup': {
+      id: '/api/public/jobs/media-cleanup'
+      path: '/api/public/jobs/media-cleanup'
+      fullPath: '/api/public/jobs/media-cleanup'
+      preLoaderRoute: typeof ApiPublicJobsMediaCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -126,6 +162,7 @@ const rootRouteChildren: RootRouteChildren = {
   EnterRoute: EnterRoute,
   HouseHouseIdRoute: HouseHouseIdRoute,
   JoinTokenRoute: JoinTokenRoute,
+  ApiPublicJobsMediaCleanupRoute: ApiPublicJobsMediaCleanupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

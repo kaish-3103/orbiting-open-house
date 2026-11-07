@@ -71,3 +71,42 @@
 - `tests/orbit_privacy_browser.py`
 - Tool-managed migrations `0002_authoritative_house_actions.sql`, `0003_bound_motion_and_voice_replay.sql`, `0004_close_legacy_door_writes.sql`, their metadata, and regenerated client types
 - `AGENTS.md`, `roadmap.md`, `ORBIT_REVIEW.md`
+
+## Focus and social expansion — November 7, 2026
+
+### Implemented
+- Personal timers: 25/5, 50/10, custom 1–240 minute focus and optional 0–60 minute break; start/pause/resume/reset, remaining versus elapsed, paused state and focusing-until display. Shared room timers use database deadlines, explicit host-only controls, opt-in participants, independent leave and explicit takeover when host leaves/disconnects. Refresh/background rendering derives from timestamps with server clock offset, never accumulated ticks. No timer activates camera/mic; completion is silent (no sound setting added).
+- Accessible avatar cards from SVG click/tap/Enter/Space, dock and phone People list. Avatar interaction stops floor movement. Cards show name/color, current room/status, current visit duration and shared timer state; offline members are labeled disconnected. Disclosure explains fellow-member visibility. Optional bio/pronouns were not added.
+- Current visit is one latest server-owned row per member/house, preserving brief reconnect and refresh; explicit leave ends it and re-entry replaces its start. No work-time claim, device tracking or productivity scoring. Recent houses persist for the guest identity, recheck membership, and support Forget without saving invite credentials. Clearing guest browser storage limitations are disclosed.
+- Waves/invitations are authenticated recipient notifications with 5-second shared rate limit and DND denial. Accept follows normal movement/knock/locked rules, not teleportation or an implicit grant.
+- Persisted room chat: authenticated sender, 1–1000 characters, 2-second send rate, timestamps, safely rendered text and unread indicator. Only currently authorized participants fetch the latest 50 messages, including messages from before their arrival. Polling stops the old room on transition, clears old content immediately and clears on errors/revocation. No broadcast chat channel leaks restricted messages.
+- Bedroom owner customization persists/synchronizes name (24-character limit), palette and curated plant/books/cushions decoration; path and door geometry unchanged.
+- Screen code: explicit browser chooser, no audio/recording, separate screen-only room transport, one active sharer lease per room, opt-in viewers, Stop sharing/viewing, browser-ended handling and server current-room lease checks. Movement and locks revoke typed leases. Camera transport is independent.
+- Listener indicator queries provider participants/subscribe permissions after server current-room authorization; unknown/reconnecting is explicit and it never derives "no listeners" from missing presence. House camera versus room voice/screens is labeled.
+- Dismissible onboarding and phone-accessible tools/profile dialogs; media remains off initially.
+- Authenticated autonomous cleanup handler and managed schedule `orbit-autonomous-media-cleanup` every minute are created. Cleanup evaluates current authorization/expiry, disables permissions before removal, retains failed removals for retry, and handles both voice and screen identities. Unauthenticated local request returned 401.
+
+### Checks actually run
+- `bunx vitest run`: **37 tests passed in 10 files**. New tests cover presets, late/background deadline calculation, break completion, paused refresh, visit elapsed semantics, avatar click/keyboard versus movement, stale cleanup without browsers, revocation and ordered/retryable provider removal. Existing mocked voice-only retry preserving camera tests still pass.
+- Two fresh independent browser guests: create/join, movement, avatar profile without changing server motion ID, Wave delivered, shared focus join, nonhost pause rejected, pause/resume, participant leave without stopping others, persisted chat readable on both, DND denial, cleared chat/wrong-room timer denial, screen lease revoked on movement, synchronized owner decor, recent-house re-entry and refresh visit preservation. Saved repeatable flow: `tests/orbit_features_browser.py`.
+- Existing two-identity privacy browser regression passed: denied/allowed knocks, bedroom lock eviction, voice lease revocation, forged payload/identity denial and early-arrival denial.
+- Reviewed timer dialog and 390×844 house/People screenshots; no horizontal overflow. No page errors in successful feature/privacy runs. Latest automatic build reports build OK. All content routes retain unique Orbit metadata.
+- Live migrations 0005/0006 were exercised through the authenticated browser RPCs; schedule metadata was listed and confirmed active.
+
+### Honest incomplete / blocked items
+- **No publication occurred.** The schedule targets the published callback, so with no published app it is prepared, not an operationally verified cleanup service. After explicitly approved deployment and provider credential rotation, verify actual scheduled requests/removal before considering the old autonomous-cleanup privacy gap closed. Minute scheduling is not immediate removal; worst-case wait approaches a minute plus provider/network latency, and failed requests retry on later runs. Batch limit is 200 leases; large backlogs need further validation.
+- No existing LiveKit secret values were inspected, printed, copied or modified. Runtime functions reference configured names only. The previously exposed credential still requires user rotation in provider settings and secure replacement in Project Settings → Secrets, never chat.
+- Real camera/mic/screens, connected-listener names, screen reconnect/browser-ended behavior and provider token replay/removal have not been verified with rotated credentials and real devices. Unit media/cleanup tests mock provider calls; screen authorization browser checks test real database leases, not transmitted screens.
+- Exhaustive non-media edge acceptance (host takeover after all clients close, custom timer completion across reconnect, repeated-wave/chat-rate boundaries, invitation acceptance at locked doors, unauthorized recent-house re-entry and Forget) was not fully exercised. The server rules exist but these are not claimed tested. No optional completion-sound control or optional bio/pronouns fields were added.
+- Polling provides room/social updates on roughly a two-second cadence and permissions/activity on the existing cadence, not instantaneous delivery. Completed focus rows remain stored; no historical timer dashboard/scoring was added, but a retention policy remains to be selected.
+
+### Two-device acceptance
+1. Rotate credentials securely; after separately approved deployment, verify scheduled cleanup runs when both browsers close.
+2. Join one house on two devices; inspect cards, shared focus pause/resume/leave/takeover, waves/DND and room chat.
+3. Enable camera explicitly; retry voice and rapidly move A→hall→A. Confirm camera persists and reconnect stays muted; listener names reflect actual voice connections.
+4. Share a screen explicitly, view from the same authorized room, reject a second sharer, then move/lock the bedroom and use browser Stop Sharing; confirm screen and voice removal while camera remains on.
+5. Check phone controls, denied permissions/network retry, late join/refresh timer completion and guest re-entry/Forget.
+
+### Changed files
+- New: `FocusPanel`, `HouseCompanion`, `ScreenSharing`, `Audience`, avatar interaction test; focus/experience/cleanup helpers and tests; screen/audience server functions; media cleanup server helper and protected callback.
+- Updated: house and enter routes, FloorPlan, voice reconciliation, architecture/checklist/review; tool-generated migrations 0005/0006, migration metadata, types and route tree. Existing unrelated files preserved.

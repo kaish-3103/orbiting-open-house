@@ -1,0 +1,6 @@
+import { expect, it, vi } from 'vitest';
+import { removeLease, staleLease } from './cleanup';
+const lease = { id: 'lease', house_id: 'house', user_id: 'user', room_key: 'lounge', expires_at: new Date(30000).toISOString(), token_expires_at: new Date(25000).toISOString(), revoked: false, removed: false };
+it('autonomous cleanup detects expiry even without browsers', () => { expect(staleLease(lease, true, 30001)).toBe(true); expect(staleLease(lease, true, 1000)).toBe(false); });
+it('door revocation denies an unexpired lease', () => { expect(staleLease(lease, false, 1000)).toBe(true); });
+it('disable precedes removal, and failed removal stays retryable', async () => { const order: string[] = []; const mark = vi.fn(); await removeLease(lease, { disable: async () => { order.push('disable'); }, remove: async () => { order.push('remove'); } }, mark, 30000); expect(order).toEqual(['disable', 'remove']); expect(mark).toHaveBeenCalledWith(true); const failedMark = vi.fn(); await expect(removeLease(lease, { disable: async () => {}, remove: async () => { throw Error('offline'); } }, failedMark, 30000)).rejects.toThrow(); expect(failedMark).not.toHaveBeenCalled(); });

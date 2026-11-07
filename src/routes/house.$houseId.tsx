@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/orbit/Logo";
 import { FloorPlan, type PlanAvatar } from "@/components/orbit/FloorPlan";
 import { VideoTile } from "@/components/orbit/VideoTile";
+import { HouseCompanion } from '@/components/orbit/HouseCompanion';
+import { ScreenSharing } from '@/components/orbit/ScreenSharing';
+import { Audience } from '@/components/orbit/Audience';
+import type { Experience } from '@/lib/experience';
 import { useOrbitMedia } from "@/hooks/useOrbitMedia";
 import { ensureGuest } from "@/lib/guest";
 import { activitySchema, knockSchema, houseAction } from "@/lib/house-actions";
@@ -40,6 +44,8 @@ function House() {
   const { houseId } = Route.useParams();
   const nav = useNavigate();
   const [me, setMe] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
+  const [roomSettings, setRoomSettings] = useState<Experience['settings']>([]);
   const [houseName, setHouseName] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
@@ -323,7 +329,7 @@ function House() {
       <div className="relative flex min-h-0 flex-1">
         <main className="relative flex min-w-0 flex-1 items-center justify-center p-4">
           <div className="aspect-[1200/780] max-h-full w-full max-w-full rounded-[2rem] bg-card p-2 shadow-soft" style={{ maxWidth: "calc((100vh - 190px) * 1200 / 780)" }}>
-            <FloorPlan avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} highlight={myRoom} />
+            <FloorPlan avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} onAvatarClick={setSelectedPerson} settings={roomSettings} highlight={myRoom} />
           </div>
           <div className="pointer-events-none absolute top-6 left-1/2 max-w-[90%] -translate-x-1/2 rounded-full bg-chrome px-4 py-1.5 text-center text-sm text-chrome-foreground shadow-float">
             {myRoom ? ROOMS[myRoom].label : "…"} · {media.voiceRoom ? <span className="text-live">Voice connected</span> : media.voiceState === "error" ? "Voice failed" : autoVoice ? (myRoom === "hallway" ? "No voice in the hallway" : media.voiceState === "connecting" ? "Connecting voice…" : "Voice unavailable") : "Voice off"}
@@ -347,7 +353,7 @@ function House() {
           </button>
           {dockOpen && (
             <div className="space-y-3 overflow-y-auto px-3 pb-3" style={{ maxHeight: "calc(100vh - 190px)" }}>
-              {online.map((p) => <VideoTile key={p.uid} presence={p} track={media.videos[p.uid]} isMe={p.uid === me} speaking={media.speakers.includes(p.uid)} />)}
+              {online.map((p) => <div key={p.uid}><Button variant="ghost" className="w-full justify-start" onClick={() => setSelectedPerson(p.uid)} aria-label={`About ${p.name}`}>{p.name}</Button><VideoTile presence={p} track={media.videos[p.uid]} isMe={p.uid === me} speaking={media.speakers.includes(p.uid)} /></div>)}
               {members.filter((m) => !peers[m.user_id]).map((m) => (
                 <div key={m.user_id} className="flex items-center gap-2 rounded-xl px-2 py-1 text-sm text-muted-foreground opacity-70">
                   <span className="h-3 w-3 rounded-full" style={{ background: `var(--${m.color})` }} />{m.display_name} · offline
@@ -358,6 +364,9 @@ function House() {
         </aside>
       </div>
 
+      {me && doorsLoaded && <HouseCompanion houseId={houseId} me={me} room={myRoom} people={members} peers={peers} selected={selectedPerson} select={setSelectedPerson} move={moveTo} owner={!!myDoorKey} onSettings={setRoomSettings} />}
+      {me && doorsLoaded && <ScreenSharing houseId={houseId} room={myRoom} />}
+      <Audience houseId={houseId} room={myRoom} connected={media.voiceState === 'connected'} mic={media.micPublished} voiceOn={autoVoice} />
       <footer className="flex flex-wrap items-center justify-center gap-2 border-t bg-card px-4 py-3">
         <Button disabled={media.cameraBusy || media.state !== "ready"} variant={media.cameraPublished ? "default" : "outline"} className="rounded-full" onClick={toggleCam}>{media.cameraPublished ? <Camera className="mr-1 h-4 w-4" /> : <CameraOff className="mr-1 h-4 w-4" />}{media.cameraBusy ? "Camera…" : media.cameraPublished ? "Camera on" : "Camera off"}</Button>
         <Button disabled={media.micBusy || !media.voiceRoom} variant={media.micPublished ? "default" : "outline"} className="rounded-full" onClick={toggleMic}>{media.micPublished ? <Mic className="mr-1 h-4 w-4" /> : <MicOff className="mr-1 h-4 w-4" />}{media.micBusy ? "Mic…" : media.micPublished ? "Mic on" : "Muted"}</Button>

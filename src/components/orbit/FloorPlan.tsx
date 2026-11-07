@@ -20,6 +20,8 @@ type Props = {
   avatars: PlanAvatar[];
   doors?: Partial<Record<RoomKey, { state: DoorState; ownerName?: string | undefined }>>;
   onFloorClick?: (p: Pt) => void;
+  onAvatarClick?: (id: string) => void;
+  settings?: { room_key: string; name: string; palette: string; decor: string }[];
   highlight?: RoomKey | null;
 };
 
@@ -119,7 +121,7 @@ function DoorBadge({ room, state, ownerName }: { room: RoomKey; state: DoorState
   );
 }
 
-export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
+export function FloorPlan({ avatars, doors, onFloorClick, onAvatarClick, settings = [], highlight }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   function handleClick(e: MouseEvent<SVGSVGElement>) {
@@ -152,7 +154,7 @@ export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
       {(Object.keys(ROOMS) as RoomKey[]).map((k) => {
         const r = ROOMS[k].rect;
         return (
-          <rect key={k} x={r.x} y={r.y} width={r.w} height={r.h} fill={fill[k]}
+          <rect key={k} x={r.x} y={r.y} width={r.w} height={r.h} fill={settings.find(s => s.room_key === k) ? `var(--${settings.find(s => s.room_key === k)?.palette})` : fill[k]}
             opacity={highlight && highlight !== k ? 0.85 : 1} />
         );
       })}
@@ -166,6 +168,7 @@ export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
         <Lounge />
         <Kitchen />
       </g>
+      {settings.map(s => { const r = ROOMS[s.room_key as RoomKey]?.rect; if (!r) return null; return <g key={s.room_key} pointerEvents="none"><text x={r.x + 180} y={r.y + 280} fontSize={20} fill="var(--foreground)" fontFamily="var(--font-display)">{s.name}</text><text x={r.x + 120} y={r.y + 285} fontSize={28}>{s.decor === 'plant' ? '🪴' : s.decor === 'books' ? '📚' : '🛋️'}</text></g>; })}
 
       {/* walls */}
       <rect x={40} y={40} width={1120} height={700} rx={4} fill="none" stroke={wall} strokeWidth={W} />
@@ -202,7 +205,7 @@ export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
 
       {/* avatars */}
       {avatars.map((a) => (
-        <g key={a.id} transform={`translate(${a.x}, ${a.y})`} pointerEvents="none">
+        <g key={a.id} transform={`translate(${a.x}, ${a.y})`} pointerEvents={onAvatarClick ? 'auto' : 'none'} role={onAvatarClick ? 'button' : undefined} tabIndex={onAvatarClick ? 0 : undefined} aria-label={onAvatarClick ? `About ${a.name}` : undefined} onClick={e => { if (onAvatarClick) { e.stopPropagation(); onAvatarClick(a.id); } }} onKeyDown={e => { if (onAvatarClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); onAvatarClick(a.id); } }}>
           {a.inVoice && <g transform="scale(1.6)"><circle className="voice-ring" r={20} fill="none" stroke="var(--live)" strokeWidth={3} /></g>}
           <ellipse cx={0} cy={32} rx={26} ry={7} fill="var(--wall)" opacity={0.15} />
           <g transform="scale(1.6)">

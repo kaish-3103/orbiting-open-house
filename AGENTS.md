@@ -32,8 +32,10 @@ use the editor.
 ## Orbit architecture
 - House geometry, pathing and door rules live in `src/lib/house.ts` (pure, unit-tested); the SVG plan only renders it.
 - Avatar movement and knocks use authenticated atomic RPCs and read-only activity/knock rows; animate server-generated paths locally and never write animation frames, because broadcast payloads have no trusted sender identity.
-- Voice/video use LiveKit with one camera-only house room and mic-only voice rooms; durable room authorization and lease-specific identities isolate stale cleanup, with short tokens and repeated revocation reconciliation to bound replay.
+- Media uses separate camera-only house, microphone-only voice and screen-only room transports; typed durable leases and unique identities isolate cleanup and keep private screens out of house video.
 - Guests are anonymous auth users; houses are joined only through `join_house(token)` RPC so house IDs alone grant nothing.
 - House creation retries use a persisted per-attempt UUID and `create_house_once`; enforce idempotency in the database so uncertain responses never create duplicates.
 - Voice transitions use the serialized VoiceSession queue; await server removal before joining with the same identity, and keep teardown failures blocking retries.
 - Media presence reflects confirmed publications, not requested toggles; avatar videos attach/detach the same tracks as the dock.
+- Focus, visits, social signals, chat and decoration mutate only through authenticated atomic experience RPCs; server deadlines synchronize timers and current-room authorization restricts message reads.
+- Autonomous media cleanup uses the generated cron authenticator and managed minute schedule; deployment and provider acceptance must be verified before calling cleanup operational.

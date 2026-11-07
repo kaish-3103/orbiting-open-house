@@ -43,6 +43,79 @@ export type Database = {
           },
         ]
       }
+      focus_participants: {
+        Row: {
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "focus_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_sessions: {
+        Row: {
+          break_seconds: number
+          created_at: string
+          deadline: string | null
+          focus_seconds: number
+          host_id: string
+          house_id: string
+          id: string
+          phase: string
+          remaining_seconds: number
+          room_key: string | null
+          state: string
+        }
+        Insert: {
+          break_seconds?: number
+          created_at?: string
+          deadline?: string | null
+          focus_seconds: number
+          host_id: string
+          house_id: string
+          id?: string
+          phase?: string
+          remaining_seconds: number
+          room_key?: string | null
+          state?: string
+        }
+        Update: {
+          break_seconds?: number
+          created_at?: string
+          deadline?: string | null
+          focus_seconds?: number
+          host_id?: string
+          house_id?: string
+          id?: string
+          phase?: string
+          remaining_seconds?: number
+          room_key?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       house_activity: {
         Row: {
           cam: boolean
@@ -198,6 +271,79 @@ export type Database = {
           },
         ]
       }
+      house_signals: {
+        Row: {
+          created_at: string
+          handled: boolean
+          house_id: string
+          id: string
+          kind: string
+          recipient_id: string
+          room_key: string | null
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          handled?: boolean
+          house_id: string
+          id?: string
+          kind: string
+          recipient_id: string
+          room_key?: string | null
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          handled?: boolean
+          house_id?: string
+          id?: string
+          kind?: string
+          recipient_id?: string
+          room_key?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "house_signals_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      house_visits: {
+        Row: {
+          ended_at: string | null
+          house_id: string
+          remembered: boolean
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          ended_at?: string | null
+          house_id: string
+          remembered?: boolean
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          ended_at?: string | null
+          house_id?: string
+          remembered?: boolean
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "house_visits_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       houses: {
         Row: {
           created_at: string
@@ -254,11 +400,80 @@ export type Database = {
           },
         ]
       }
+      room_messages: {
+        Row: {
+          body: string
+          created_at: string
+          house_id: string
+          id: string
+          room_key: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          house_id: string
+          id?: string
+          room_key: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          house_id?: string
+          id?: string
+          room_key?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_messages_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_settings: {
+        Row: {
+          decor: string
+          house_id: string
+          name: string
+          palette: string
+          room_key: string
+        }
+        Insert: {
+          decor?: string
+          house_id: string
+          name: string
+          palette?: string
+          room_key: string
+        }
+        Update: {
+          decor?: string
+          house_id?: string
+          name?: string
+          palette?: string
+          room_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_settings_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voice_leases: {
         Row: {
           expires_at: string
           house_id: string
           id: string
+          is_sharer: boolean
+          media_kind: string
           removed: boolean
           revoked: boolean
           room_key: string
@@ -269,6 +484,8 @@ export type Database = {
           expires_at?: string
           house_id: string
           id?: string
+          is_sharer?: boolean
+          media_kind?: string
           removed?: boolean
           revoked?: boolean
           room_key: string
@@ -279,6 +496,8 @@ export type Database = {
           expires_at?: string
           house_id?: string
           id?: string
+          is_sharer?: boolean
+          media_kind?: string
           removed?: boolean
           revoked?: boolean
           room_key?: string
@@ -334,7 +553,25 @@ export type Database = {
         Args: { _action: string; _house: string; _payload?: Json }
         Returns: Json
       }
+      orbit_current: {
+        Args: { _house: string; _room: string; _user: string }
+        Returns: boolean
+      }
+      orbit_experience: {
+        Args: { _action: string; _house: string; _payload?: Json }
+        Returns: Json
+      }
       orbit_room: { Args: { _x: number; _y: number }; Returns: string }
+      orbit_screen: {
+        Args: {
+          _action: string
+          _house: string
+          _lease?: string
+          _room?: string
+          _share?: boolean
+        }
+        Returns: Json
+      }
       orbit_voice: {
         Args: {
           _action: string

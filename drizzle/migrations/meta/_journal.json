@@ -36,6 +36,20 @@
       "when": 1794086948492,
       "tag": "0004_close_legacy_door_writes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794089284035,
+      "tag": "0005_focus_visits_social_rooms",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794089532443,
+      "tag": "0006_room_screen_leases",
+      "breakpoints": true
     }
   ]
 }

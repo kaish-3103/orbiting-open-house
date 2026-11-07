@@ -23,8 +23,8 @@ export const reconcileVoice = createServerFn({ method: "POST" }).middleware([req
     for (const l of stale) {
       await supabaseAdmin.from("voice_leases").update({ revoked: true }).eq("id", l.id);
       try {
-        await service.updateParticipant(`${l.house_id}:voice:${l.room_key}`, `${l.user_id}:${l.id}`, { permission: { canSubscribe: false, canPublish: false, canPublishData: false } });
-        await service.removeParticipant(`${l.house_id}:voice:${l.room_key}`, `${l.user_id}:${l.id}`);
+        await service.updateParticipant(`${l.house_id}:${l.media_kind}:${l.room_key}`, `${l.user_id}:${l.id}`, { permission: { canSubscribe: false, canPublish: false, canPublishData: false } });
+        await service.removeParticipant(`${l.house_id}:${l.media_kind}:${l.room_key}`, `${l.user_id}:${l.id}`);
       }
       catch (e) { if (!(e instanceof Error && "status" in e && e.status === 404)) return { ok: false }; }
       const { error: update } = await supabaseAdmin.from("voice_leases").update({ removed: Date.parse(l.token_expires_at) < Date.now() }).eq("id", l.id);

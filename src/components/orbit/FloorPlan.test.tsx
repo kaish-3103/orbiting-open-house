@@ -1,0 +1,4 @@
+import { render, fireEvent } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
+import { FloorPlan } from './FloorPlan';
+it('avatar click and keyboard activation open information without movement', () => { const move = vi.fn(); const profile = vi.fn(); const view = render(<FloorPlan avatars={[{ id: 'sam', name: 'Sam', x: 100, y: 100, color: 'sage' }]} onFloorClick={move} onAvatarClick={profile} />); const avatar = view.getByRole('button', { name: 'About Sam' }); fireEvent.click(avatar); fireEvent.keyDown(avatar, { key: 'Enter' }); expect(profile.mock.calls).toEqual([['sam'], ['sam']]); expect(move).not.toHaveBeenCalled(); });
