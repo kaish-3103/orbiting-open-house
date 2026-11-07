@@ -84,7 +84,8 @@ export function canEnter(
   door: { owner_id: string | null; state: DoorState } | undefined,
   hasGrant: boolean,
 ): "ok" | "knock" | "locked" {
-  if (!door || room === "hallway" || room === "lounge" || room === "kitchen") return "ok";
+  if (room === "hallway" || room === "lounge" || room === "kitchen") return "ok";
+  if (!door) return "locked";
   if (door.owner_id === userId || door.state === "open") return "ok";
   if (door.state === "locked") return "locked";
   return hasGrant ? "ok" : "knock";

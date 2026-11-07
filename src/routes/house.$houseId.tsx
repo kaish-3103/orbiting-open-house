@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Camera, CameraOff, ChevronDown, ChevronUp, DoorOpen, Hand, Link2, Lock, LogOut, Mic, MicOff, Radio, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,10 @@ import { FloorPlan, type PlanAvatar } from "@/components/orbit/FloorPlan";
 import { VideoTile } from "@/components/orbit/VideoTile";
 import { useOrbitMedia } from "@/hooks/useOrbitMedia";
 import { ensureGuest } from "@/lib/guest";
-import { canEnter, planPath, roomAt, ROOMS, spawnPoint, STATUSES, STATUS_LABEL, type DoorState, type Pt, type RoomKey, type Status } from "@/lib/house";
+import { activitySchema, knockSchema, houseAction } from "@/lib/house-actions";
+import { reconcileVoice } from "@/lib/voice-access.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { canEnter, roomAt, ROOMS, STATUSES, STATUS_LABEL, type DoorState, type Pt, type RoomKey, type Status } from "@/lib/house";
 
 export const Route = createFileRoute("/house/$houseId")({
   ssr: false,
@@ -31,7 +33,7 @@ export const Route = createFileRoute("/house/$houseId")({
 type Member = { user_id: string; display_name: string; color: string };
 type Door = { room_key: string; owner_id: string | null; state: DoorState };
 type Presence = { uid: string; name: string; color: string; status: Status; room: RoomKey | null; x: number; y: number; cam: boolean; mic: boolean; voice: boolean };
-type Motion = { pos: Pt; path: Pt[] };
+type Motion = { pos: Pt; path: Pt[]; motionId?: string };
 const SPEED = 280; // px/s
 
 function House() {
@@ -56,15 +58,18 @@ function House() {
   const [myRoom, setMyRoom] = useState<RoomKey | null>(null);
   const [, setTick] = useState(0);
   const motions = useRef<Record<string, Motion>>({});
-  const chan = useRef<RealtimeChannel | null>(null);
+  const reconcile = useServerFn(reconcileVoice);
+  const arriving = useRef<string | null>(null);
+  const seenKnocks = useRef(new Set<string>());
   const pendingKnock = useRef<Pt | null>(null);
 
   // ---------- data ----------
   const loadDoors = useCallback(async () => {
-    const [{ data: d }, { data: g }] = await Promise.all([
+    const [{ data: d, error: de }, { data: g, error: ge }] = await Promise.all([
       supabase.from("room_doors").select("room_key,owner_id,state").eq("house_id", houseId),
       supabase.from("door_grants").select("room_key,user_id").eq("house_id", houseId),
     ]);
+    if (de || ge) { setDoorsLoaded(false); setDoors([]); setGrants([]); throw new Error("Could not verify room permissions. Retry the house."); }
     setDoors((d as Door[]) ?? []);
     setGrants(g ?? []);
     setDoorsLoaded(true);
@@ -103,107 +108,88 @@ function House() {
 
   const media = useOrbitMedia({ houseId, enabled: !!me && doorsLoaded && !denied, myRoom, autoVoice, micOn, camOn, allowedRooms: (r) => access(r) === "ok", onCameraFailed: () => setCamOn(false), onMicFailed: () => setMicOn(false) });
 
-  // ---------- presence ----------
-  const myPresence = useCallback((): Presence | null => {
-    if (!me) return null;
-    const m = memberMap[me];
-    const pos = motions.current[me]?.pos ?? spawnPoint(myDoorKey ?? null);
-    return { uid: me, name: m?.display_name ?? "Guest", color: m?.color ?? "sage", status, room: roomAt(pos), x: pos.x, y: pos.y, cam: media.cameraPublished, mic: media.micPublished, voice: !!media.voiceRoom };
-  }, [me, memberMap, status, media.cameraPublished, media.micPublished, media.voiceRoom, myDoorKey]);
-  const presenceRef = useRef(myPresence);
-  presenceRef.current = myPresence;
-
-  useEffect(() => {
-    if (!me || !members.length || denied || !doorsLoaded) return;
-    let ch: RealtimeChannel;
-    (async () => {
-      await supabase.realtime.setAuth();
-      ch = supabase.channel(`house:${houseId}`, { config: { private: true, presence: { key: me }, broadcast: { self: false } } });
-      ch.on("presence", { event: "sync" }, () => {
-        const st = ch.presenceState<Presence>();
-        const next: Record<string, Presence> = {};
-        for (const [k, arr] of Object.entries(st)) {
-          const p = arr[arr.length - 1];
-          if (!p) continue;
-          next[k] = p;
-          if (k !== me && !motions.current[k]) motions.current[k] = { pos: { x: p.x, y: p.y }, path: [] };
-        }
-        for (const k of Object.keys(motions.current)) if (k !== me && !next[k]) delete motions.current[k];
-        setPeers(next);
-      });
-      ch.on("broadcast", { event: "move" }, ({ payload }) => {
-        const { uid, from, path } = payload as { uid: string; from: Pt; path: Pt[] };
-        motions.current[uid] = { pos: motions.current[uid]?.pos ?? from, path };
-      });
-      ch.on("broadcast", { event: "knock" }, ({ payload }) => {
-        const { from, room, name } = payload as { from: string; room: string; name: string };
-        if (doorMapRef.current[room]?.owner_id !== me) return;
-        if (statusRef.current === "dnd") { ch.send({ type: "broadcast", event: "knock-reply", payload: { to: from, room, allowed: false, reason: "dnd" } }); return; }
-        toast(`${name} is knocking on your door`, {
-          duration: 20000,
-          action: { label: "Let in", onClick: async () => {
-            await supabase.from("door_grants").insert({ house_id: houseId, room_key: room, user_id: from });
-            ch.send({ type: "broadcast", event: "knock-reply", payload: { to: from, room, allowed: true } });
-          } },
-          cancel: { label: "Not now", onClick: () => ch.send({ type: "broadcast", event: "knock-reply", payload: { to: from, room, allowed: false } }) },
+  // Only authenticated database actions create activity and knock records.
+  const syncActivity = useCallback(async () => {
+    const { data, error } = await supabase.from("house_activity").select("*").eq("house_id", houseId);
+    if (error) { setMyRoom(null); throw new Error("Could not verify house activity"); }
+    const next: Record<string, Presence> = {};
+    for (const raw of data ?? []) {
+      const result = activitySchema.safeParse(raw);
+      if (!result.success || Date.parse(result.data.updated_at) < Date.now() - 30000) continue;
+      const a = result.data; const member = memberMap[a.user_id];
+      if (!member) continue;
+      next[a.user_id] = { uid: a.user_id, name: member.display_name, color: member.color, status: a.status, room: a.room_key, x: a.x, y: a.y, cam: a.cam, mic: a.mic, voice: a.mic };
+      const motion = motions.current[a.user_id];
+      if (!motion || motion.motionId !== a.motion_id) motions.current[a.user_id] = { pos: { x: a.x, y: a.y }, path: a.path, motionId: a.motion_id };
+      else if (!a.path.length) { motion.pos = { x: a.x, y: a.y }; motion.path = []; }
+      if (a.user_id === me) setMyRoom(a.room_key);
+    }
+    for (const uid of Object.keys(motions.current)) if (!next[uid]) delete motions.current[uid];
+    setPeers(next);
+  }, [houseId, me, memberMap]);
+  const syncKnocks = useCallback(async () => {
+    const { data, error } = await supabase.from("house_knocks").select("*").eq("house_id", houseId).gte("created_at", new Date(Date.now() - 60000).toISOString());
+    if (error) throw new Error("Could not verify door requests");
+    for (const raw of data ?? []) {
+      const parsed = knockSchema.safeParse(raw); if (!parsed.success) continue;
+      const k = parsed.data; const mark = `${k.id}:${k.decision}`;
+      if (seenKnocks.current.has(mark)) continue;
+      seenKnocks.current.add(mark);
+      const reply = async (allow: boolean) => {
+        try { await houseAction(houseId, "reply", { id: k.id, allow }); await loadDoors(); }
+        catch (e) { toast.error(e instanceof Error ? e.message : "Could not answer the knock"); }
+      };
+      if (k.owner_id === me && k.decision === "pending") {
+        if (status === "dnd") { void reply(false); continue; }
+        toast(`${memberMap[k.sender_id]?.display_name ?? "A house member"} is knocking on your door`, {
+          duration: 20000, action: { label: "Let in", onClick: () => void reply(true) }, cancel: { label: "Not now", onClick: () => void reply(false) },
         });
-      });
-      ch.on("broadcast", { event: "knock-reply" }, async ({ payload }) => {
-        const { to, allowed, reason } = payload as { to: string; allowed: boolean; reason?: string };
-        if (to !== me) return;
-        if (!allowed) { toast(reason === "dnd" ? "They're in Do Not Disturb" : "They can't let you in right now"); pendingKnock.current = null; return; }
-        await loadDoors();
-        toast.success("You were let in");
-        if (pendingKnock.current) { const p = pendingKnock.current; pendingKnock.current = null; setTimeout(() => moveToRef.current(p, true), 100); }
-      });
-      ch.subscribe(async (s) => {
-        if (s === "SUBSCRIBED") { const p = presenceRef.current(); if (p) await ch.track(p); }
-        if (s === "CHANNEL_ERROR") toast.error("Lost connection to the house");
-      });
-      chan.current = ch;
-    })();
-    return () => { if (ch) supabase.removeChannel(ch); chan.current = null; };
-  }, [me, members.length > 0, houseId, denied, loadDoors, doorsLoaded]);
-
-  const doorMapRef = useRef(doorMap); doorMapRef.current = doorMap;
+      }
+      if (k.sender_id === me && k.decision !== "pending") {
+        if (k.decision === "allowed") { await loadDoors(); toast.success("You were let in"); const target = pendingKnock.current; pendingKnock.current = null; if (target) void moveToRef.current(target); }
+        else { pendingKnock.current = null; toast("They can't let you in right now"); }
+      }
+    }
+  }, [houseId, me, memberMap, status, loadDoors]);
+  useEffect(() => {
+    if (!me || !doorsLoaded || !members.length || denied) return;
+    let disposed = false;
+    const refresh = () => { if (!disposed) void syncActivity().catch((e) => toast.error(e.message)); };
+    void houseAction(houseId, "enter").then(refresh).catch((e) => setLoadError(e.message));
+    const ch = supabase.channel(`authorized-${houseId}-${crypto.randomUUID()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "house_activity", filter: `house_id=eq.${houseId}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "house_knocks", filter: `house_id=eq.${houseId}` }, () => { void syncKnocks().catch((e) => toast.error(e.message)); })
+      .subscribe();
+    const timer = setInterval(() => { refresh(); void syncKnocks().catch(() => {}); void reconcile({ data: { houseId } }).catch(() => {}); }, 3000);
+    return () => { disposed = true; clearInterval(timer); void supabase.removeChannel(ch); };
+  }, [me, houseId, doorsLoaded, members.length > 0, denied, syncActivity, syncKnocks]);
+  useEffect(() => {
+    if (!me || !doorsLoaded || denied) return;
+    const heartbeat = () => { void houseAction(houseId, "heartbeat", { status, cam: media.cameraPublished, mic: media.micPublished }).catch(() => { setMyRoom(null); }); };
+    heartbeat(); const timer = setInterval(heartbeat, 10000);
+    return () => clearInterval(timer);
+  }, [me, houseId, doorsLoaded, denied, status, media.cameraPublished, media.micPublished]);
   const statusRef = useRef(status); statusRef.current = status;
 
-  // re-track on state changes
-  useEffect(() => { const p = myPresence(); if (p && chan.current) chan.current.track(p); }, [myPresence, myRoom]);
-
   // ---------- movement ----------
-  useEffect(() => {
-    if (me && doorsLoaded && !motions.current[me]) {
-      const p = spawnPoint(myDoorKey ?? null);
-      motions.current[me] = { pos: p, path: [] };
-      setMyRoom(roomAt(p));
-    }
-  }, [me, myDoorKey, doorsLoaded]);
-
-  const moveTo = useCallback((target: Pt, skipCheck = false) => {
-    if (!me) return;
-    const m = motions.current[me];
-    if (!m) return;
-    const rt = roomAt(target);
-    if (!rt) return;
-    if (!skipCheck && rt !== roomAt(m.pos)) {
-      const a = access(rt);
-      if (a === "locked") { toast(`${ROOMS[rt].label} is locked`, { icon: <Lock className="h-4 w-4" /> }); return; }
-      if (a === "knock") {
-        const owner = doorMap[rt]?.owner_id;
-        const ownerOnline = owner && peers[owner];
-        if (!ownerOnline) { toast("Nobody's home to answer"); return; }
+  const moveTo = useCallback(async (target: Pt) => {
+    if (!me || !doorsLoaded) return;
+    const rt = roomAt(target); if (!rt) return;
+    const permission = access(rt);
+    if (permission === "locked") { toast(`${ROOMS[rt].label} is locked`, { icon: <Lock className="h-4 w-4" /> }); return; }
+    try {
+      if (permission === "knock") {
         pendingKnock.current = target;
-        chan.current?.send({ type: "broadcast", event: "knock", payload: { from: me, room: rt, name: memberMap[me]?.display_name } });
-        toast("Knocked — waiting for an answer…", { icon: <Hand className="h-4 w-4" /> });
-        return;
+        await houseAction(houseId, "knock", { room: rt });
+        toast("Knocked — waiting for an answer…", { icon: <Hand className="h-4 w-4" /> }); return;
       }
-      if (doorMap[rt]?.owner_id && peers[doorMap[rt]!.owner_id!]?.status === "dnd") toast(`${memberMap[doorMap[rt]!.owner_id!]?.display_name} is in Do Not Disturb`);
-    }
-    const path = planPath(m.pos, target);
-    m.path = path;
-    chan.current?.send({ type: "broadcast", event: "move", payload: { uid: me, from: m.pos, path } });
-  }, [me, access, doorMap, peers, memberMap]);
+      const result = activitySchema.parse(await houseAction(houseId, "move", target));
+      const motion = motions.current[me];
+      motions.current[me] = { pos: motion?.pos ?? { x: result.x, y: result.y }, path: result.path, motionId: result.motion_id };
+      setMyRoom(null); setMicOn(false);
+      void reconcile({ data: { houseId } }).catch(() => {});
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't move. Retry."); }
+  }, [me, doorsLoaded, access, houseId, reconcile]);
   const moveToRef = useRef(moveTo); moveToRef.current = moveTo;
 
   useEffect(() => {
@@ -216,14 +202,14 @@ function House() {
         changed = true;
         let step = SPEED * dt;
         while (step > 0 && m.path.length) {
-          const tgt = m.path[0]!;
+          const tgt = m.path[0];
+          if (!tgt) break;
           const dx = tgt.x - m.pos.x, dy = tgt.y - m.pos.y, d = Math.hypot(dx, dy);
           if (d <= step) { m.pos = { ...tgt }; m.path.shift(); step -= d; } else { m.pos = { x: m.pos.x + (dx / d) * step, y: m.pos.y + (dy / d) * step }; step = 0; }
         }
-        if (uid === me) {
-          const r = roomAt(m.pos);
-          setMyRoom((prev) => (prev !== r ? r : prev));
-          if (!m.path.length) { const p = presenceRef.current(); if (p) chan.current?.track(p); }
+        if (uid === me && !m.path.length && m.motionId && arriving.current !== m.motionId) {
+          const motionId = m.motionId; arriving.current = motionId;
+          void houseAction(houseId, "arrive", { motionId }).then(() => syncActivity()).catch((e) => { setMyRoom(null); toast.error(e.message); });
         }
       }
       if (changed) setTick((x) => x + 1);
@@ -231,7 +217,7 @@ function House() {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [me]);
+  }, [me, houseId, syncActivity]);
 
   // room-change notifications
   const prevRoom = useRef<RoomKey | null>(null);
@@ -284,9 +270,7 @@ function House() {
   }
   async function setDoor(state: DoorState) {
     if (!myDoorKey) return;
-    await supabase.from("room_doors").update({ state }).eq("house_id", houseId).eq("room_key", myDoorKey);
-    await supabase.from("door_grants").delete().eq("house_id", houseId).eq("room_key", myDoorKey);
-    loadDoors();
+    try { await houseAction(houseId, "door", { state }); await loadDoors(); const result = await reconcile({ data: { houseId } }); if (!result.ok) toast.error("Door changed; voice removal is retrying."); } catch (e) { toast.error(e instanceof Error ? e.message : "Could not change door"); }
   }
   function copyInvite() {
     if (!invite) return;
@@ -294,6 +278,7 @@ function House() {
   }
   async function leave() {
     setCamOn(false); setMicOn(false); setAutoVoice(false);
+    try { await houseAction(houseId, "leave"); await reconcile({ data: { houseId } }); } catch { toast.error("Voice removal will retry; close this tab if disconnected."); }
     nav({ to: "/" });
   }
 
@@ -324,9 +309,9 @@ function House() {
             <div className="flex items-center gap-1 rounded-full bg-chrome-muted p-1 text-sm">
               <span className="px-2 opacity-70">Your door</span>
               {(["open", "knock", "locked"] as DoorState[]).map((s) => (
-                <button key={s} onClick={() => setDoor(s)} className={`flex items-center gap-1 rounded-full px-3 py-1 capitalize transition ${myDoor.state === s ? "bg-chrome-foreground text-chrome" : "hover:bg-chrome"}`}>
+                <Button key={s} size="sm" variant="ghost" title={s === "locked" ? "Owner only; removes guests and clears approvals" : s === "knock" ? "New approval required; removes unapproved guests" : "Anyone in this house may enter; clears old approvals"} onClick={() => setDoor(s)} className={`flex items-center gap-1 rounded-full px-3 py-1 capitalize transition ${myDoor.state === s ? "bg-chrome-foreground text-chrome" : "hover:bg-chrome"}`}>
                   {s === "open" ? <DoorOpen className="h-3.5 w-3.5" /> : s === "knock" ? <Hand className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}{s === "knock" ? "Knock" : s}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -340,7 +325,7 @@ function House() {
           <div className="aspect-[1200/780] max-h-full w-full max-w-full rounded-[2rem] bg-card p-2 shadow-soft" style={{ maxWidth: "calc((100vh - 190px) * 1200 / 780)" }}>
             <FloorPlan avatars={avatars} doors={doorView} onFloorClick={(p) => moveTo(p)} highlight={myRoom} />
           </div>
-          <div className="pointer-events-none absolute top-6 left-1/2 -translate-x-1/2 rounded-full bg-chrome px-4 py-1.5 text-sm text-chrome-foreground shadow-float">
+          <div className="pointer-events-none absolute top-6 left-1/2 max-w-[90%] -translate-x-1/2 rounded-full bg-chrome px-4 py-1.5 text-center text-sm text-chrome-foreground shadow-float">
             {myRoom ? ROOMS[myRoom].label : "…"} · {media.voiceRoom ? <span className="text-live">Voice connected</span> : media.voiceState === "error" ? "Voice failed" : autoVoice ? (myRoom === "hallway" ? "No voice in the hallway" : media.voiceState === "connecting" ? "Connecting voice…" : "Voice unavailable") : "Voice off"}
           </div>
           {media.state === "unconfigured" && (
@@ -351,7 +336,8 @@ function House() {
           )}
           {Object.values(media.errors).some(Boolean) && <div role="alert" className="absolute bottom-6 left-6 max-w-xs space-y-2 rounded-lg border bg-card p-4 text-sm shadow-float">
             {Object.entries(media.errors).map(([key, error]) => error ? <p key={key}>{error}</p> : null)}
-            {(media.errors.voice || media.errors.connection) && <Button size="sm" variant="outline" onClick={media.retry}>Retry connection</Button>}
+            {media.errors.voice && <Button size="sm" variant="outline" onClick={media.retryVoice}>Retry voice</Button>}
+            {media.errors.connection && <Button size="sm" variant="outline" onClick={media.retryVideo}>Retry video</Button>}
           </div>}
         </main>
 

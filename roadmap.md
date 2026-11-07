@@ -1,4 +1,8 @@
 # Orbit roadmap
+- [ ] Server-authorized rooms, atomic door/grant revocation and session-scoped voice access
+- [ ] Authenticated movement/presence/knocks instead of trusted broadcast payloads
+- [ ] Separate voice/video recovery and cover stale cleanup/reconnect/device failures
+- [ ] Privacy regression tests, two-identity browser flows, phone checks and precise review report
 - [x] Enlarge avatars and refresh the front page with a larger centered logo; checked desktop/mobile, entry buttons and 8 regression tests
 - [x] Landing, onboarding, invite join, guest identities
 - [x] Founders' Loft plan, click-to-move, realtime presence, room detection

@@ -15,6 +15,20 @@
       "when": 1794085283314,
       "tag": "0001_idempotent_house_creation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794086307022,
+      "tag": "0002_authoritative_house_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794086422151,
+      "tag": "0003_bound_motion_and_voice_replay",
+      "breakpoints": true
     }
   ]
 }

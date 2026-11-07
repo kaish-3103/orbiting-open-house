@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import * as lk from "livekit-client";
 import type { Room, RemoteTrack, Track } from "livekit-client";
 import { getLivekitToken, leaveVoiceRoom } from "@/lib/livekit.functions";
 import { VOICE_ROOMS, type RoomKey } from "@/lib/house";
 import { bounded } from "@/lib/async-operation";
 import { VoiceSession } from "@/lib/voice-session";
+import { checkVoiceLease } from "@/lib/voice-access.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 type Opts = { houseId: string; enabled?: boolean; myRoom: RoomKey | null; autoVoice: boolean; micOn: boolean; camOn: boolean; allowedRooms: (r: RoomKey) => boolean; onCameraFailed: () => void; onMicFailed: () => void };
 export type MediaState = "loading" | "unconfigured" | "ready" | "error";
@@ -18,7 +21,11 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
   const [cameraBusy, setCameraBusy] = useState(false);
   const [micBusy, setMicBusy] = useState(false);
   const [errors, setErrors] = useState<{ camera?: string | undefined; mic?: string | undefined; voice?: string | undefined; connection?: string | undefined }>({});
-  const [retryId, setRetryId] = useState(0);
+  const [videoRetryId, setVideoRetryId] = useState(0);
+  const [voiceRetryId, setVoiceRetryId] = useState(0);
+  const tokenFn = useServerFn(getLivekitToken);
+  const leaveFn = useServerFn(leaveVoiceRoom);
+  const checkFn = useServerFn(checkVoiceLease);
   const videoRoom = useRef<Room | null>(null);
   const voice = useRef<Room | null>(null);
   const session = useRef<VoiceSession<RoomKey> | null>(null);
@@ -30,13 +37,12 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
     let cancelled = false;
     let room: Room | null = null;
     setState("loading");
-    setErrors({});
+    setErrors((e) => ({ ...e, connection: undefined }));
     (async () => {
       try {
-        const res = await bounded(getLivekitToken({ data: { houseId, kind: "video" } }), "Video connection timed out");
+        const res = await bounded(tokenFn({ data: { houseId, kind: "video" } }), "Video connection timed out");
         if (cancelled) return;
         if (!res.configured) { setState("unconfigured"); return; }
-        const lk = await import("livekit-client");
         const connection = new lk.Room({ adaptiveStream: true, dynacast: true });
         room = connection;
         const refresh = () => {
@@ -56,6 +62,8 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
           .on(lk.RoomEvent.TrackMuted, refresh).on(lk.RoomEvent.TrackUnmuted, refresh)
           .on(lk.RoomEvent.LocalTrackPublished, refresh).on(lk.RoomEvent.LocalTrackUnpublished, refresh)
           .on(lk.RoomEvent.ParticipantDisconnected, refresh)
+          .on(lk.RoomEvent.Reconnecting, () => { if (!cancelled) { setCameraPublished(false); setState("loading"); } })
+          .on(lk.RoomEvent.Reconnected, () => { if (!cancelled) { setState("ready"); refresh(); } })
           .on(lk.RoomEvent.Disconnected, () => {
             if (cancelled) return;
             setVideos({}); setCameraPublished(false); setState("error");
@@ -71,24 +79,25 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
       }
     })();
     return () => { cancelled = true; void room?.disconnect(); videoRoom.current = null; };
-  }, [houseId, retryId, enabled]);
+  }, [houseId, videoRetryId, enabled]);
 
   useEffect(() => {
     let disposed = false;
     const controller = new VoiceSession<RoomKey>(async (key, current) => {
-      const res = await bounded(getLivekitToken({ data: { houseId, kind: "voice", roomKey: key as "lounge" } }), "Voice connection timed out");
-      if (!res.configured) throw new Error("Voice unavailable");
-      const lk = await import("livekit-client");
+      const res = await bounded(tokenFn({ data: { houseId, kind: "voice", roomKey: key as "lounge" } }), "Voice connection timed out");
+      if (!res.configured || !res.leaseId) throw new Error("Voice unavailable");
       const room = new lk.Room();
       const audio = new Set<HTMLMediaElement>();
+      let leaseTimer: ReturnType<typeof setInterval> | undefined;
       const cleanup = () => {
+        clearInterval(leaseTimer);
         audio.forEach((el) => { el.pause(); el.srcObject = null; el.remove(); }); audio.clear();
         room.remoteParticipants.forEach((p) => p.trackPublications.forEach((pub) => pub.track?.detach().forEach((el) => el.remove())));
       };
       const remove = async () => {
         // Do not race server removal against a timer: a late removal could kick
         // a newly joined participant. The UI watchdog is bounded, the queue isn't.
-        const result = await leaveVoiceRoom({ data: { houseId, roomKey: key as "lounge" } });
+        const result = await leaveFn({ data: { houseId, roomKey: key as "lounge", leaseId: res.leaseId } });
         if (!result.ok) throw new Error("Voice teardown failed");
       };
       const disconnect = async () => { cleanup(); await room.disconnect(); };
@@ -103,12 +112,20 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
         cleanup();
         if (!disposed && current()) { voice.current = null; setVoiceRoom(null); setMicPublished(false); setSpeakers([]); setVoiceState("error"); setErrors((e) => ({ ...e, voice: "Voice disconnected. Retry voice." })); }
       });
-      room.on(lk.RoomEvent.ActiveSpeakersChanged, (ps) => { if (!disposed && current()) setSpeakers(ps.map((p) => p.identity)); });
+      room.on(lk.RoomEvent.ActiveSpeakersChanged, (ps) => { if (!disposed && current()) setSpeakers(ps.map((p) => p.identity.split(":")[0] ?? p.identity)); });
+      room.on(lk.RoomEvent.Reconnecting, () => { if (!disposed && current()) { setVoiceRoom(null); setMicPublished(false); setVoiceState("connecting"); callbacks.current.onMicFailed(); } });
       const refreshMic = () => { if (!disposed && current()) setMicPublished(room.localParticipant.isMicrophoneEnabled); };
       room.on(lk.RoomEvent.LocalTrackPublished, refreshMic).on(lk.RoomEvent.LocalTrackUnpublished, refreshMic)
         .on(lk.RoomEvent.TrackMuted, refreshMic).on(lk.RoomEvent.TrackUnmuted, refreshMic);
       try {
         await room.connect(res.url, res.token, { websocketTimeout: 15000, peerConnectionTimeout: 15000 });
+        const check = await bounded(checkFn({ data: { houseId, leaseId: res.leaseId } }), "Voice permission timed out");
+        if (!check.ok) throw new Error("Voice permission revoked");
+        leaseTimer = setInterval(() => {
+          void bounded(checkFn({ data: { houseId, leaseId: res.leaseId } }), "Voice permission timed out").then((result) => {
+            if (!result.ok) { void disconnect(); void remove(); }
+          }).catch(() => { void disconnect(); void remove(); });
+        }, 5000);
       } catch (error) {
         // Preserve a cleanup handle even on connect failure so retries cannot race removal.
         return { key, disconnect, remove, failure: error };
@@ -120,7 +137,7 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
     return () => { disposed = true; session.current = null; voice.current = null; void controller.switchTo(null, () => {}); };
   }, [houseId]);
 
-  const target = state === "ready" && autoVoice && myRoom && VOICE_ROOMS.includes(myRoom) && allowedRooms(myRoom) ? myRoom : null;
+  const target = enabled && autoVoice && myRoom && VOICE_ROOMS.includes(myRoom) && allowedRooms(myRoom) ? myRoom : null;
   useEffect(() => {
     let cancelled = false;
     setVoiceRoom(null); setSpeakers([]); setMicPublished(false); voice.current = null;
@@ -140,7 +157,7 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
       if (error) setErrors((e) => ({ ...e, voice: "Couldn't connect voice. Check your connection and retry." }));
     });
     return () => { cancelled = true; clearTimeout(watchdog); };
-  }, [target, retryId]);
+  }, [target, voiceRetryId]);
 
   useEffect(() => {
     const room = videoRoom.current;
@@ -180,5 +197,5 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
     return () => { cancelled = true; };
   }, [micOn, voiceRoom]);
 
-  return { state, videos, voiceRoom, voiceState, speakers, cameraPublished, micPublished, cameraBusy, micBusy, errors, retry: () => setRetryId((n) => n + 1) };
+  return { state, videos, voiceRoom, voiceState, speakers, cameraPublished, micPublished, cameraBusy, micBusy, errors, retryVoice: () => setVoiceRetryId((n) => n + 1), retryVideo: () => setVideoRetryId((n) => n + 1) };
 }

@@ -43,6 +43,59 @@ export type Database = {
           },
         ]
       }
+      house_activity: {
+        Row: {
+          cam: boolean
+          house_id: string
+          mic: boolean
+          motion_id: string
+          motion_ready_at: string
+          path: Json
+          room_key: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          x: number
+          y: number
+        }
+        Insert: {
+          cam?: boolean
+          house_id: string
+          mic?: boolean
+          motion_id?: string
+          motion_ready_at?: string
+          path?: Json
+          room_key?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          x?: number
+          y?: number
+        }
+        Update: {
+          cam?: boolean
+          house_id?: string
+          mic?: boolean
+          motion_id?: string
+          motion_ready_at?: string
+          path?: Json
+          room_key?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "house_activity_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       house_invites: {
         Row: {
           created_at: string
@@ -68,6 +121,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "house_invites_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      house_knocks: {
+        Row: {
+          created_at: string
+          decision: string
+          house_id: string
+          id: string
+          owner_id: string
+          room_key: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          decision?: string
+          house_id: string
+          id?: string
+          owner_id: string
+          room_key: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          decision?: string
+          house_id?: string
+          id?: string
+          owner_id?: string
+          room_key?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "house_knocks_house_id_fkey"
             columns: ["house_id"]
             isOneToOne: false
             referencedRelation: "houses"
@@ -163,6 +254,47 @@ export type Database = {
           },
         ]
       }
+      voice_leases: {
+        Row: {
+          expires_at: string
+          house_id: string
+          id: string
+          removed: boolean
+          revoked: boolean
+          room_key: string
+          token_expires_at: string
+          user_id: string
+        }
+        Insert: {
+          expires_at?: string
+          house_id: string
+          id?: string
+          removed?: boolean
+          revoked?: boolean
+          room_key: string
+          token_expires_at?: string
+          user_id: string
+        }
+        Update: {
+          expires_at?: string
+          house_id?: string
+          id?: string
+          removed?: boolean
+          revoked?: boolean
+          room_key?: string
+          token_expires_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_leases_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -193,6 +325,24 @@ export type Database = {
       join_house: {
         Args: { _color: string; _display_name: string; _token: string }
         Returns: string
+      }
+      orbit_access: {
+        Args: { _house: string; _room: string; _user: string }
+        Returns: boolean
+      }
+      orbit_action: {
+        Args: { _action: string; _house: string; _payload?: Json }
+        Returns: Json
+      }
+      orbit_room: { Args: { _x: number; _y: number }; Returns: string }
+      orbit_voice: {
+        Args: {
+          _action: string
+          _house: string
+          _lease?: string
+          _room?: string
+        }
+        Returns: Json
       }
     }
     Enums: {

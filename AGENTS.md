@@ -31,8 +31,8 @@ use the editor.
 
 ## Orbit architecture
 - House geometry, pathing and door rules live in `src/lib/house.ts` (pure, unit-tested); the SVG plan only renders it.
-- Avatar movement is broadcast (path per click) and presence on a private realtime topic `house:<id>`, gated by RLS on realtime.messages via `is_house_member` — never write positions to tables.
-- Voice/video use LiveKit with tokens from `src/lib/livekit.functions.ts`: one house-wide camera-only room plus one mic-only room per voice room; door state is enforced server-side when issuing voice tokens.
+- Avatar movement and knocks use authenticated atomic RPCs and read-only activity/knock rows; animate server-generated paths locally and never write animation frames, because broadcast payloads have no trusted sender identity.
+- Voice/video use LiveKit with one camera-only house room and mic-only voice rooms; durable room authorization and lease-specific identities isolate stale cleanup, with short tokens and repeated revocation reconciliation to bound replay.
 - Guests are anonymous auth users; houses are joined only through `join_house(token)` RPC so house IDs alone grant nothing.
 - House creation retries use a persisted per-attempt UUID and `create_house_once`; enforce idempotency in the database so uncertain responses never create duplicates.
 - Voice transitions use the serialized VoiceSession queue; await server removal before joining with the same identity, and keep teardown failures blocking retries.
