@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ token: vi.fn(), leave: vi.fn(), rooms: [] as any[] }));
+const mocks = vi.hoisted(() => ({ token: vi.fn(), leave: vi.fn(), check: vi.fn(async () => ({ ok: true })), rooms: [] as any[] }));
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
-vi.mock("@/lib/voice-access.functions", () => ({ checkVoiceLease: vi.fn(async () => ({ ok: true })) }));
+vi.mock("@/lib/voice-access.functions", () => ({ checkVoiceLease: mocks.check }));
 vi.mock("@/lib/livekit.functions", () => ({ getLivekitToken: mocks.token, leaveVoiceRoom: mocks.leave }));
 vi.mock("livekit-client", () => {
   class Room {
@@ -87,5 +87,26 @@ describe("confirmed media state", () => {
     expect(oldLease).toBe("lease-2");
     act(() => finish?.());
     expect(next.result.current.voiceRoom).toBe("lounge"); next.unmount();
+  });
+  it("rejects a late connected session when its lease was revoked", async () => {
+    mocks.token.mockResolvedValue({ configured: true, url: "wss://test.invalid", token: "test", leaseId: "revoked-lease" });
+    mocks.check.mockResolvedValueOnce({ ok: false }); mocks.leave.mockResolvedValue({ ok: true });
+    const { result, unmount } = renderHook(() => useOrbitMedia(options()));
+    await waitFor(() => expect(result.current.voiceState).toBe("error"));
+    expect(result.current.voiceRoom).toBeNull();
+    expect(result.current.micPublished).toBe(false);
+    unmount();
+    await waitFor(() => expect(mocks.leave).toHaveBeenCalledWith({ data: { houseId: "house", roomKey: "lounge", leaseId: "revoked-lease" } }));
+  });
+  it("reconnect checks permission and keeps the microphone muted", async () => {
+    mocks.token.mockResolvedValue({ configured: true, url: "wss://test.invalid", token: "test", leaseId: "lease" }); mocks.leave.mockResolvedValue({ ok: true });
+    const props = options(); const { result, unmount } = renderHook(() => useOrbitMedia(props));
+    await waitFor(() => expect(result.current.voiceRoom).toBe("lounge"));
+    act(() => mocks.rooms[1].emit("Reconnecting"));
+    expect(result.current.voiceState).toBe("connecting"); expect(props.onMicFailed).toHaveBeenCalled();
+    act(() => mocks.rooms[1].emit("Reconnected"));
+    await waitFor(() => expect(result.current.voiceRoom).toBe("lounge"));
+    expect(mocks.rooms[1].localParticipant.setMicrophoneEnabled).not.toHaveBeenCalledWith(true);
+    expect(result.current.micPublished).toBe(false); unmount();
   });
 });

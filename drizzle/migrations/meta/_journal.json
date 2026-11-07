@@ -29,6 +29,13 @@
       "when": 1794086422151,
       "tag": "0003_bound_motion_and_voice_replay",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794086948492,
+      "tag": "0004_close_legacy_door_writes",
+      "breakpoints": true
     }
   ]
 }

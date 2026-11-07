@@ -114,6 +114,13 @@ export function useOrbitMedia({ houseId, enabled = true, myRoom, autoVoice, micO
       });
       room.on(lk.RoomEvent.ActiveSpeakersChanged, (ps) => { if (!disposed && current()) setSpeakers(ps.map((p) => p.identity.split(":")[0] ?? p.identity)); });
       room.on(lk.RoomEvent.Reconnecting, () => { if (!disposed && current()) { setVoiceRoom(null); setMicPublished(false); setVoiceState("connecting"); callbacks.current.onMicFailed(); } });
+      room.on(lk.RoomEvent.Reconnected, () => {
+        void bounded(checkFn({ data: { houseId, leaseId: res.leaseId } }), "Voice permission timed out").then(async (result) => {
+          if (!result.ok || !current() || disposed) { await disconnect(); await remove(); return; }
+          await room.localParticipant.setMicrophoneEnabled(false);
+          setMicPublished(false); setVoiceRoom(key); setVoiceState("connected");
+        }).catch(() => { void disconnect(); void remove(); });
+      });
       const refreshMic = () => { if (!disposed && current()) setMicPublished(room.localParticipant.isMicrophoneEnabled); };
       room.on(lk.RoomEvent.LocalTrackPublished, refreshMic).on(lk.RoomEvent.LocalTrackUnpublished, refreshMic)
         .on(lk.RoomEvent.TrackMuted, refreshMic).on(lk.RoomEvent.TrackUnmuted, refreshMic);

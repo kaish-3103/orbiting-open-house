@@ -36,6 +36,21 @@ export const reconcileVoice = createServerFn({ method: "POST" }).middleware([req
 export const checkVoiceLease = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ houseId: z.string().uuid(), leaseId: z.string().uuid() }).strict().parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.rpc("orbit_voice", { _house: data.houseId, _action: "check", _lease: data.leaseId });
-    return { ok: !error };
+    const { data: lease, error } = await context.supabase.rpc("orbit_voice", { _house: data.houseId, _action: "check", _lease: data.leaseId });
+    const result = z.object({ room_key: z.enum(["bedroom1", "bedroom2", "lounge", "kitchen"]) }).safeParse(lease);
+    if (error || !result.success) return { ok: false };
+    const url = process.env["LIVEKIT_URL"], key = process.env["LIVEKIT_API_KEY"], secret = process.env["LIVEKIT_API_SECRET"];
+    if (!url || !key || !secret) return { ok: false };
+    const { RoomServiceClient, TrackSource } = await import("livekit-server-sdk");
+    try {
+      await new RoomServiceClient(url.replace(/^wss:/, "https:").replace(/^ws:/, "http:"), key, secret)
+        .updateParticipant(`${data.houseId}:voice:${result.data.room_key}`, `${context.userId}:${data.leaseId}`, { permission: { canSubscribe: true, canPublish: true, canPublishData: false, canPublishSources: [TrackSource.MICROPHONE] } });
+      // Check again after activation in case a door or room transition raced the request.
+      const checked = await context.supabase.rpc("orbit_voice", { _house: data.houseId, _action: "check", _lease: data.leaseId });
+      if (checked.error) {
+        await new RoomServiceClient(url.replace(/^wss:/, "https:").replace(/^ws:/, "http:"), key, secret).removeParticipant(`${data.houseId}:voice:${result.data.room_key}`, `${context.userId}:${data.leaseId}`);
+        return { ok: false };
+      }
+      return { ok: true };
+    } catch { return { ok: false }; }
   });

@@ -31,4 +31,10 @@ describe("door rules", () => {
   it("communal rooms are always open", () => {
     expect(canEnter("lounge", "guest", undefined, false)).toBe("ok");
   });
+  it("missing bedroom permissions fail closed", () => {
+    expect(canEnter("bedroom1", "guest", undefined, true)).toBe("locked");
+  });
+  it("locking overrides a previous approval", () => {
+    expect(canEnter("bedroom1", "guest", door("locked"), true)).toBe("locked");
+  });
 });

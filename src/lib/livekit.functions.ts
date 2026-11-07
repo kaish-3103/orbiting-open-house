@@ -54,8 +54,10 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     at.addGrant({
       room: lkRoom,
       roomJoin: true,
-      canSubscribe: true,
-      canPublish: true,
+      // Voice starts inert. The authenticated post-connect lease check activates it.
+      // Replaying a stale token can join but cannot hear or publish anything.
+      canSubscribe: data.kind === "video",
+      canPublish: data.kind === "video",
       canPublishData: false,
       canPublishSources: [data.kind === "video" ? TrackSource.CAMERA : TrackSource.MICROPHONE],
     });
