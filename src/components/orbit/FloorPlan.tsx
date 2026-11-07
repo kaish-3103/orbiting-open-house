@@ -15,7 +15,7 @@ export type PlanAvatar = {
 
 type Props = {
   avatars: PlanAvatar[];
-  doors?: Partial<Record<RoomKey, { state: DoorState; ownerName?: string }>>;
+  doors?: Partial<Record<RoomKey, { state: DoorState; ownerName?: string | undefined }>>;
   onFloorClick?: (p: Pt) => void;
   highlight?: RoomKey | null;
 };
@@ -96,14 +96,14 @@ function Kitchen() {
   );
 }
 
-function DoorBadge({ room, state, ownerName }: { room: RoomKey; state: DoorState; ownerName?: string }) {
+function DoorBadge({ room, state, ownerName }: { room: RoomKey; state: DoorState; ownerName?: string | undefined }) {
   const d = DOORS[room as keyof typeof DOORS];
   const r = ROOMS[room].rect;
   const cx = (d.x0 + d.x1) / 2;
   const icon = state === "locked" ? "🔒" : state === "knock" ? "✋" : "🚪";
   return (
     <g pointerEvents="none">
-      <rect x={r.x + 14} y={r.y + 14} rx={12} height={26} width={Math.max(96, (ownerName?.length ?? 6) * 8 + 70)}
+      <rect x={r.x + 14} y={r.y + 14} rx={12} height={26} width={(ROOMS[room].label.length + (ownerName ? ownerName.length + 3 : 0)) * 7.6 + 30}
         fill="var(--chrome)" opacity={0.92} />
       <text x={r.x + 28} y={r.y + 32} fontSize={13} fill="var(--chrome-foreground)" fontFamily="var(--font-sans)">
         {ROOMS[room].label}{ownerName ? ` · ${ownerName}` : ""}

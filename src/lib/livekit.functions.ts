@@ -11,9 +11,9 @@ const input = z.object({
 });
 
 function cfg() {
-  const url = process.env.LIVEKIT_URL;
-  const key = process.env.LIVEKIT_API_KEY;
-  const secret = process.env.LIVEKIT_API_SECRET;
+  const url = process.env["LIVEKIT_URL"];
+  const key = process.env["LIVEKIT_API_KEY"];
+  const secret = process.env["LIVEKIT_API_SECRET"];
   return url && key && secret ? { url, key, secret } : null;
 }
 

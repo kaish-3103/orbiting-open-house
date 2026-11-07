@@ -28,3 +28,9 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Orbit architecture
+- House geometry, pathing and door rules live in `src/lib/house.ts` (pure, unit-tested); the SVG plan only renders it.
+- Avatar movement is broadcast (path per click) and presence on a private realtime topic `house:<id>`, gated by RLS on realtime.messages via `is_house_member` — never write positions to tables.
+- Voice/video use LiveKit with tokens from `src/lib/livekit.functions.ts`: one house-wide camera-only room plus one mic-only room per voice room; door state is enforced server-side when issuing voice tokens.
+- Guests are anonymous auth users; houses are joined only through `join_house(token)` RPC so house IDs alone grant nothing.

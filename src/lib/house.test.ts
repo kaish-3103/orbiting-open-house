@@ -12,9 +12,9 @@ describe("room geometry", () => {
   it("routes between bedrooms through the hallway doors", () => {
     const p = planPath({ x: 200, y: 200 }, { x: 900, y: 200 });
     expect(p.length).toBe(5);
-    expect(roomAt(p[1])).toBe("hallway");
-    expect(roomAt(p[2])).toBe("hallway");
-    expect(roomAt(p[4])).toBe("bedroom2");
+    expect(roomAt(p[1]!)).toBe("hallway");
+    expect(roomAt(p[2]!)).toBe("hallway");
+    expect(roomAt(p[4]!)).toBe("bedroom2");
   });
 });
 
