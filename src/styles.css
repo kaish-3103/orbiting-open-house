@@ -132,7 +132,7 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0; }
 }
 
 @utility shadow-soft { box-shadow: var(--shadow-soft); }
@@ -143,3 +143,7 @@
 @keyframes ring-pulse { 0% { r: 20; opacity: .6; } 100% { r: 34; opacity: 0; } }
 .avatar-idle { animation: avatar-breathe 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .voice-ring { animation: ring-pulse 1.6s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-idle, .voice-ring { animation: none; }
+}

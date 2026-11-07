@@ -203,8 +203,9 @@ export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
       {/* avatars */}
       {avatars.map((a) => (
         <g key={a.id} transform={`translate(${a.x}, ${a.y})`} pointerEvents="none">
-          {a.inVoice && <circle className="voice-ring" r={20} fill="none" stroke="var(--live)" strokeWidth={3} />}
-          <ellipse cx={0} cy={20} rx={16} ry={5} fill="var(--wall)" opacity={0.15} />
+          {a.inVoice && <g transform="scale(1.6)"><circle className="voice-ring" r={20} fill="none" stroke="var(--live)" strokeWidth={3} /></g>}
+          <ellipse cx={0} cy={32} rx={26} ry={7} fill="var(--wall)" opacity={0.15} />
+          <g transform="scale(1.6)">
           <g className={a.moving ? "" : "avatar-idle"}>
             <circle r={20} fill={`var(--${a.color})`} stroke={a.isMe ? "var(--wall)" : "var(--card)"} strokeWidth={a.isMe ? 4 : 3} />
             {a.track ? <AvatarVideo track={a.track} isMe={a.isMe} /> : <g>
@@ -213,10 +214,11 @@ export function FloorPlan({ avatars, doors, onFloorClick, highlight }: Props) {
             <path d="M -6 6 Q 0 11 6 6" stroke="var(--wall)" strokeWidth={2} fill="none" strokeLinecap="round" />
             </g>}
           </g>
-          {a.status && <circle cx={15} cy={-15} r={6} fill={statusColor[a.status] ?? "var(--muted)"} stroke="var(--card)" strokeWidth={2} />}
-          <g transform="translate(0, 38)">
-            <rect x={-(a.name.length * 4 + 12)} y={-12} width={a.name.length * 8 + 24} height={22} rx={11} fill="var(--chrome)" opacity={0.9} />
-            <text y={4} textAnchor="middle" fontSize={12} fill="var(--chrome-foreground)" fontFamily="var(--font-sans)" fontWeight={600}>
+          </g>
+          {a.status && <circle cx={24} cy={-24} r={8} fill={statusColor[a.status] ?? "var(--muted)"} stroke="var(--card)" strokeWidth={2} />}
+          <g transform="translate(0, 52)">
+            <rect x={-(a.name.length * 5 + 14)} y={-14} width={a.name.length * 10 + 28} height={27} rx={13.5} fill="var(--chrome)" opacity={0.9} />
+            <text y={5} textAnchor="middle" fontSize={15} fill="var(--chrome-foreground)" fontFamily="var(--font-sans)" fontWeight={600}>
               {a.name}
             </text>
           </g>

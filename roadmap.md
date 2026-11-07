@@ -1,4 +1,5 @@
 # Orbit roadmap
+- [x] Enlarge avatars and refresh the front page with a larger centered logo; checked desktop/mobile, entry buttons and 8 regression tests
 - [x] Landing, onboarding, invite join, guest identities
 - [x] Founders' Loft plan, click-to-move, realtime presence, room detection
 - [x] Open / Knock / Locked doors (server-enforced for voice), statuses, auto-away
